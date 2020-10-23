@@ -10,7 +10,7 @@ The data used in this manuscript that accompany these codes is available at the 
 
 <br />
 
-## Citing these codes. Please cite these codes if they help in your research
+## Citing these codes.
 
 If you use these codes in your research, please consider citing [our Zenodo
 record](https://zenodo.org/badge/latestdoi/):
