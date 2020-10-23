@@ -1,3 +1,5 @@
+https://zenodo.org/badge/DOI/10.5281/zenodo.4124182.svg
+
 # Codes to predict leaf traits using PLSR models
 
 These codes are used to predict leaf traits by Partial Least Squares Regression (PLSR) models in R. The prediction of leaf traits here is based on spectroscopy techniques using reflectance spectra or continuum wavelet transformation spectra. <br />
