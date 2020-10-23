@@ -1,4 +1,4 @@
-https://zenodo.org/badge/DOI/10.5281/zenodo.4124182.svg
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.4124182.svg)](https://doi.org/10.5281/zenodo.4124182)
 
 # Codes to predict leaf traits using PLSR models
 
