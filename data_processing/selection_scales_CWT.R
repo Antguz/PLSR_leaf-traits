@@ -193,27 +193,28 @@ PLSR_wavelet_combinations <- function(model, trait = logLMA, data_split, train_I
   pb <- txtProgressBar(min = 1, max = (nrow(combinations)*iterations), style = 3) 
   n <- 1
   
-  #Cross validation
-  CVseg <- CVseg_uniform
-  
   #Loop
-  for(i in 1:nrow(combinations)) {
+  for(i in 1:iterations) {
     
     ##Make cluster
     cl <- parallel::makeCluster(threads, type = "PSOCK")
     pls.options(parallel = cl)
     
-    #Create the summed-wavelet
-    spectra <- summed_wavelet(cwt_cube, as.numeric(combinations[i,]))
-    
-    #data split
-    training <- cbind(trait_train, spectra[data_split,])
-    testing <- cbind(trait_test, spectra[-data_split,])
-    
     #Frame to complete
     iteration_frame <- frame
     
-    for(j in 1:iterations) {
+    #Cross validation
+    CVseg <- CVSeg_lifeforms(train_ID_lf, length.seg = length.seg)
+    
+    #Loop combination
+    for(j in 1:nrow(combinations)) {
+      
+      #Create the summed-wavelet
+      spectra <- summed_wavelet(cwt_cube, as.numeric(combinations[j,]))
+      
+      #data split
+      training <- cbind(trait_train, spectra[data_split,])
+      testing <- cbind(trait_test, spectra[-data_split,])
       
       ###Progress
       setTxtProgressBar(pb, n)
@@ -260,8 +261,8 @@ PLSR_wavelet_combinations <- function(model, trait = logLMA, data_split, train_I
       
       ###Fill frame-------------------------------------------------------------------------------------------------------
       
-      iteration_frame[j, 1] <- combinations_names[i] #Scale combination
-      iteration_frame[j, 2] <- j #Iteration
+      iteration_frame[j, 1] <- combinations_names[j] #Scale combination
+      iteration_frame[j, 2] <- i #Iteration
       iteration_frame[j, 3] <- n_comp #Components
       iteration_frame[j, 4] <- training_perf[2]
       iteration_frame[j, 5] <- training_perf[3]
@@ -275,7 +276,7 @@ PLSR_wavelet_combinations <- function(model, trait = logLMA, data_split, train_I
     }
     
     final <- rbind(final, iteration_frame)
-    fwrite(iteration_frame, paste("", "scale_", combinations_names[i], ".csv", sep = ""))
+    fwrite(iteration_frame, paste("", "iteration_", i, ".csv", sep = ""))
     
     ###Stop cluster
     stopCluster(cl)
@@ -295,7 +296,7 @@ results <- PLSR_wavelet_combinations(model = logLMA ~ .,
                                      combinations = CWT_scales, 
                                      cwt_cube = CWT_spectra, 
                                      int_ncomp = 50, 
-                                     iterations = 1, 
+                                     iterations = 2, 
                                      length.seg = 10, 
                                      threads = 12,
                                      name_trait = "LMA")
