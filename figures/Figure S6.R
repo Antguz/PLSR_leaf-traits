@@ -4,82 +4,72 @@
 
 #Note: inputs come from code_base.R
 
-###Library
-library(Rmisc)
-library(ggplo2)
-library(data.table)
+###Libraries
+library(ggplot2)
 library(ggpubr)
-library(PupillometryR)
+library(scales)
+library(data.table)
+library(ggExtra)
+library(plyr)
 
-###Load and prepare the data
-ref_LMA <- fread("ref_LMA_stats.csv")
-ref_WC <- fread("ref_WC_stats.csv")
-ref_EWT <- fread("ref_EWT_stats.csv")
-cwt_LMA <- fread("cwt_LMA_stats.csv")
-cwt_WC <- fread("cwt_WC_stats.csv")
-cwt_EWT <- fread("cwt_EWT_stats.csv")
+###Data and preparations
+LMA_predict <- fread("/home/antguz/Documents/PLSR-models/Data/04-results/06-Predict_train/LMA_predict_training.csv")
+LMA_predict[Spectra == "CWT", Spectra := "Wavelet"]
+WC_predict <- fread("/home/antguz/Documents/PLSR-models/Data/04-results/06-Predict_train/WC_predict_training.csv")
+WC_predict[Spectra == "CWT", Spectra := "Wavelet"]
+EWT_predict <- fread("/home/antguz/Documents/PLSR-models/Data/04-results/06-Predict_train/EWT_predict_training.csv")
+EWT_predict[Spectra == "CWT", Spectra := "Wavelet"]
 
-ref_LMA$Trait <- "LMA"
-ref_WC$Trait <- "WC"
-ref_EWT$Trait <- "EWT"
-cwt_LMA$Trait <- "LMA"
-cwt_WC$Trait <- "WC"
-cwt_EWT$Trait <- "EWT"
+#Data manage
+LMA  <- melt(LMA_predict, id.vars=c("Spectra", "iteration"),
+             measure.vars = .SD,
+             value.name = "Trait")
+LMA <- LMA[, list(mean(Trait), (mean(Trait) - sd(Trait)), (mean(Trait) + sd(Trait))), by = c("Spectra", "variable")]
+colnames(LMA)[3:5] <- c("mean", "sd_lower", "sd_upper")
+LMA <- LMA[order(Spectra, variable)]
 
-ref_LMA$Spectra <- "Reflectance"
-ref_WC$Spectra <- "Reflectance"
-ref_EWT$Spectra <- "Reflectance"
-cwt_LMA$Spectra <- "Wavelet"
-cwt_WC$Spectra <- "Wavelet"
-cwt_EWT$Spectra <- "Wavelet"
+WC  <- melt(WC_predict, id.vars=c("Spectra", "iteration"),
+            measure.vars = .SD,
+            value.name = "Trait")
+WC <- WC[, list(mean(Trait), (mean(Trait) - sd(Trait)), (mean(Trait) + sd(Trait))), by = c("Spectra", "variable")]
+colnames(WC)[3:5] <- c("mean", "sd_lower", "sd_upper")
+WC <- WC[order(Spectra, variable)]
 
+EWT  <- melt(EWT_predict, id.vars=c("Spectra", "iteration"),
+             measure.vars = .SD,
+             value.name = "Trait")
+EWT <- EWT[, list(mean(Trait), (mean(Trait) - sd(Trait)), (mean(Trait) + sd(Trait))), by = c("Spectra", "variable")]
+colnames(EWT)[3:5] <- c("mean", "sd_lower", "sd_upper")
+EWT <- EWT[order(Spectra, variable)]
 
-###Merge
-data <- rbind(ref_LMA, ref_WC, ref_EWT, cwt_LMA, cwt_WC, cwt_EWT)
+observed <- fread("/home/antguz/Documents/PLSR-models/Data/03-spectra/traits_training.csv")
+colnames(observed)[3:5] <- c("LMA", "WC", "EWT")
+observed$LMA <- 10^observed$LMA
+observed$WC <- 10^observed$WC
+observed$EWT <- 10^observed$EWT
+observed[Life_form == "Tree", Life_form := "Trees"]
+observed[Life_form == "Liana", Life_form := "Lianas"]
+observed$Life_form <- as.factor(observed$Life_form)
+observed$Life_form <- factor(observed$Life_form, levels = c("Lianas", "Trees"))
 
-Rsq <- data[, c(1:4, 5, 9:10)]
-Bias <- data[, c(1:4, 6, 9:10)]
-RMSE <- data[, c(1:4, 7, 9:10)]
-RMSE_P <- data[, c(1:4, 8, 9:10)]
+ref_LMA <- cbind(observed[,c(1,3)], LMA[Spectra == "Reflectance"])
+ref_WC <- cbind(observed[,c(1,4)], WC[Spectra == "Reflectance"])
+ref_EWT <- cbind(observed[,c(1,5)], EWT[Spectra == "Reflectance"]) 
+cwt_LMA <- cbind(observed[,c(1,3)], LMA[Spectra == "Wavelet"])
+cwt_WC <- cbind(observed[,c(1,4)], WC[Spectra == "Wavelet"])
+cwt_EWT <- cbind(observed[,c(1,5)], EWT[Spectra == "Wavelet"])
 
-Rsq$Parameter <- "Rsq"
-Bias$Parameter <- "Bias"
-RMSE$Parameter <- "RMSE"
-RMSE_P$Parameter <- "RMSE_P"
+ref_LMA[, c("fit", "lwr", "upr") := as.data.table((predict(lm(LMA ~ mean, .SD), newdata = .SD, interval = "prediction"))), by = "Life_form"]
+ref_WC[, c("fit", "lwr", "upr") := as.data.table((predict(lm(WC ~ mean, .SD), newdata = .SD, interval = "prediction"))), by = "Life_form"]
+ref_EWT[, c("fit", "lwr", "upr") := as.data.table((predict(lm(EWT ~ mean, .SD), newdata = .SD, interval = "prediction"))), by = "Life_form"]
+cwt_LMA[, c("fit", "lwr", "upr") := as.data.table((predict(lm(LMA ~ mean, .SD), newdata = .SD, interval = "prediction"))), by = "Life_form"]
+cwt_WC[, c("fit", "lwr", "upr") := as.data.table((predict(lm(WC ~ mean, .SD), newdata = .SD, interval = "prediction"))), by = "Life_form"]
+cwt_EWT[, c("fit", "lwr", "upr") := as.data.table((predict(lm(EWT ~ mean, .SD), newdata = .SD, interval = "prediction"))), by = "Life_form"]
 
-colnames(Rsq)[5] <- "Value"
-colnames(Bias)[5] <- "Value"
-colnames(RMSE)[5] <- "Value"
-colnames(RMSE_P)[5] <- "Value"
-
-###final to keep
-data <- rbind(Rsq, Bias, RMSE, RMSE_P)
-data$Spectra <- as.factor(data$Spectra)
-data$Spectra <- factor(data$Spectra, levels = c("Reflectance", "Wavelet"))
-
-###For figure
-data_life_form <- subset(data, Life_form != "All")
-data_life_form <- data_life_form[Process == "Training"]
-data_life_form$Life_form <- as.factor(data_life_form$Life_form)
-data_life_form$Life_form <- factor(data_life_form$Life_form, levels = c("Lianas", "Trees"))
-
-LMA <- data_life_form[Trait == "LMA"]
-WC <- data_life_form[Trait == "WC"]
-EWT <- data_life_form[Trait == "EWT"]
-
-###For lines
-data_all <- subset(data, Life_form == "All")
-data_all <- data_all[Process == "Training"]
-
-LMA_all <- data_all[Trait == "LMA"]
-WC_all <- data_all[Trait == "WC"]
-EWT_all <- data_all[Trait == "EWT"]
-
-####------------------Figure
-
-pa <- c("#33B09F", "#B66A34")
-tamano <- 14
-tamano2 <- 10
+#Parameters for figure
+pa <- c("#e66101", "#5e3c99")
+tamano <- 13
+tamano2 <- 12
 
 th <- theme_bw(base_size = tamano) + theme(plot.background = element_blank(),
                                            panel.grid.major = element_blank(),
@@ -91,242 +81,195 @@ th <- theme_bw(base_size = tamano) + theme(plot.background = element_blank(),
                                            strip.text.y = element_text(size = tamano, color = "black"),
                                            strip.background = element_rect(color= "black", fill="grey90", linetype="solid"))
 
-######----Rsq
-LMA_Rsq <- summarySE(LMA[Parameter == "Rsq"], measurevar = "Value",
-                     groupvars=c("Spectra", "Life_form"))
+LMA_range <- c(0, 315)
+WC_range <- c(40, 95)
+EWT_range <- c(0, 410)
+size_point <- 1.5
 
-LMA_rsq <- summarySE(LMA_all[Parameter == "Rsq"], measurevar = "Value",
-                     groupvars=c("Spectra"))
-
-A <- ggplot() +
-  geom_errorbar(data= LMA_rsq, aes(x = Spectra, ymax= Value, ymin= Value), colour = "grey20", linetype = 2) +  
-  geom_flat_violin(data = LMA[Parameter == "Rsq"], aes(x = Spectra, y = Value, fill = Life_form), position = position_nudge(x = .1, y = 0), adjust = 1.5, trim = FALSE, alpha = .35, colour = "white") +
-  geom_point(data = LMA[Parameter == "Rsq"], aes(x = as.numeric(Spectra)-.15, y = Value, colour = Life_form), position = position_jitter(width = .05), size = .25, shape = 20) +
-  geom_boxplot(data = LMA[Parameter == "Rsq"], aes(x = Spectra, y = Value, fill = Life_form), outlier.shape = NA, alpha = .5, width = .1, colour = "black") +
-  geom_line(data = LMA_Rsq, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form), linetype = 3) +
-  geom_point(data = LMA_Rsq, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form), shape = 18) +
-  geom_errorbar(data = LMA_Rsq, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form, ymin = Value-se, ymax = Value+se), width = .05) +    scale_colour_manual(values = c("Lianas" = '#33B09F', "Trees" = '#B66A34')) +
-  scale_fill_manual(values = c("Lianas" = '#33B09F', "Trees" = '#B66A34')) +
-  scale_y_continuous(limits = c(0.7, 0.95), expand=c(0,0)) +
-  th + xlab("") + ylab("") + theme( axis.text.x = element_blank()) 
-  facet_grid(. ~ Trait, labeller = label_parsed)
-
-WC_Rsq <- summarySE(WC[Parameter == "Rsq"], measurevar = "Value",
-                    groupvars=c("Spectra", "Life_form"))
-
-WC_rsq <- summarySE(WC_all[Parameter == "Rsq"], measurevar = "Value",
-                     groupvars=c("Spectra"))
-
-B <- ggplot() +
-  geom_errorbar(data= WC_rsq, aes(x = Spectra, ymax= Value, ymin= Value), colour = "grey20", linetype = 2) +  
-  geom_flat_violin(data = WC[Parameter == "Rsq"], aes(x = Spectra, y = Value, fill = Life_form), position = position_nudge(x = .1, y = 0), adjust = 1.5, trim = FALSE, alpha = .35, colour = "white") +
-  geom_point(data = WC[Parameter == "Rsq"], aes(x = as.numeric(Spectra)-.15, y = Value, colour = Life_form), position = position_jitter(width = .05), size = .25, shape = 20) +
-  geom_boxplot(data = WC[Parameter == "Rsq"], aes(x = Spectra, y = Value, fill = Life_form), outlier.shape = NA, alpha = .5, width = .1, colour = "black") +
-  geom_line(data = WC_Rsq, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form), linetype = 3) +
-  geom_point(data = WC_Rsq, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form), shape = 18) +
-  geom_errorbar(data = WC_Rsq, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form, ymin = Value-se, ymax = Value+se), width = .05) +    scale_colour_manual(values = c("Lianas" = '#33B09F', "Trees" = '#B66A34')) +
-  scale_fill_manual(values = c("Lianas" = '#33B09F', "Trees" = '#B66A34')) +
-  scale_y_continuous(limits = c(0.7, 0.94), expand=c(0,0)) +
-  th + xlab("") + ylab("") + theme( axis.text.x = element_blank()) 
-  facet_grid(. ~ Trait, labeller = label_parsed)
-
-EWT_Rsq <- summarySE(EWT[Parameter == "Rsq"], measurevar = "Value",
-                     groupvars=c("Spectra", "Life_form"))
-
-EWT_rsq <- summarySE(EWT_all[Parameter == "Rsq"], measurevar = "Value",
-                    groupvars=c("Spectra"))
-
-C <- ggplot() +
-  geom_errorbar(data= EWT_rsq, aes(x = Spectra, ymax= Value, ymin= Value), colour = "grey20", linetype = 2) +  
-  geom_flat_violin(data = EWT[Parameter == "Rsq"], aes(x = Spectra, y = Value, fill = Life_form), position = position_nudge(x = .1, y = 0), adjust = 1.5, trim = FALSE, alpha = .35, colour = "white") +
-  geom_point(data = EWT[Parameter == "Rsq"], aes(x = as.numeric(Spectra)-.15, y = Value, colour = Life_form), position = position_jitter(width = .05), size = .25, shape = 20) +
-  geom_boxplot(data = EWT[Parameter == "Rsq"], aes(x = Spectra, y = Value, fill = Life_form), outlier.shape = NA, alpha = .5, width = .1, colour = "black") +
-  geom_line(data = EWT_Rsq, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form), linetype = 3) +
-  geom_point(data = EWT_Rsq, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form), shape = 18) +
-  geom_errorbar(data = EWT_Rsq, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form, ymin = Value-se, ymax = Value+se), width = .05) +    scale_colour_manual(values = c("Lianas" = '#33B09F', "Trees" = '#B66A34')) +
-  scale_fill_manual(values = c("Lianas" = '#33B09F', "Trees" = '#B66A34')) +
-  scale_y_continuous(limits = c(0.2, 0.9), expand=c(0,0)) +
-  th + xlab("") + ylab("") + theme( axis.text.x = element_blank()) 
-  facet_grid(. ~ Trait, labeller = label_parsed)
-
-######----Bias
-LMA_Bias <- summarySE(LMA[Parameter == "Bias"], measurevar = "Value",
-                     groupvars=c("Spectra", "Life_form"))
-
-LMA_bias <- summarySE(LMA_all[Parameter == "Bias"], measurevar = "Value",
-                     groupvars=c("Spectra"))
-
-D <- ggplot() +
-  geom_errorbar(data= LMA_bias, aes(x = Spectra, ymax= Value, ymin= Value), colour = "grey20", linetype = 2) +  
-  geom_flat_violin(data = LMA[Parameter == "Bias"], aes(x = Spectra, y = Value, fill = Life_form), position = position_nudge(x = .1, y = 0), adjust = 1.5, trim = FALSE, alpha = .35, colour = "white") +
-  geom_point(data = LMA[Parameter == "Bias"], aes(x = as.numeric(Spectra)-.15, y = Value, colour = Life_form), position = position_jitter(width = .05), size = .25, shape = 20) +
-  geom_boxplot(data = LMA[Parameter == "Bias"], aes(x = Spectra, y = Value, fill = Life_form), outlier.shape = NA, alpha = .5, width = .1, colour = "black") +
-  geom_line(data = LMA_Bias, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form), linetype = 3) +
-  geom_point(data = LMA_Bias, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form), shape = 18) +
-  geom_errorbar(data = LMA_Bias, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form, ymin = Value-se, ymax = Value+se), width = .05) +    scale_colour_manual(values = c("Lianas" = '#33B09F', "Trees" = '#B66A34')) +
-  scale_fill_manual(values = c("Lianas" = '#33B09F', "Trees" = '#B66A34')) +
-  scale_y_continuous(limits = c(-0.05, 0.05), expand=c(0,0)) +
-  th + xlab("") + ylab("") + theme( axis.text.x = element_blank())
-
-WC_Bias <- summarySE(WC[Parameter == "Bias"], measurevar = "Value",
-                     groupvars=c("Spectra", "Life_form"))
-
-WC_bias <- summarySE(WC_all[Parameter == "Bias"], measurevar = "Value",
-                     groupvars=c("Spectra"))
-
-E <- ggplot() +
-  geom_errorbar(data= WC_bias, aes(x = Spectra, ymax= Value, ymin= Value), colour = "grey20", linetype = 2) +  
-  geom_flat_violin(data = WC[Parameter == "Bias"], aes(x = Spectra, y = Value, fill = Life_form), position = position_nudge(x = .1, y = 0), adjust = 1.5, trim = FALSE, alpha = .35, colour = "white") +
-  geom_point(data = WC[Parameter == "Bias"], aes(x = as.numeric(Spectra)-.15, y = Value, colour = Life_form), position = position_jitter(width = .05), size = .25, shape = 20) +
-  geom_boxplot(data = WC[Parameter == "Bias"], aes(x = Spectra, y = Value, fill = Life_form), outlier.shape = NA, alpha = .5, width = .1, colour = "black") +
-  geom_line(data = WC_Bias, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form), linetype = 3) +
-  geom_point(data = WC_Bias, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form), shape = 18) +
-  geom_errorbar(data = WC_Bias, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form, ymin = Value-se, ymax = Value+se), width = .05) +    scale_colour_manual(values = c("Lianas" = '#33B09F', "Trees" = '#B66A34')) +
-  scale_fill_manual(values = c("Lianas" = '#33B09F', "Trees" = '#B66A34')) +
-  scale_y_continuous(limits = c(-0.02, 0.02), expand=c(0,0)) +
-  th + xlab("") + ylab("") + theme( axis.text.x = element_blank())
-
-EWT_Bias <- summarySE(EWT[Parameter == "Bias"], measurevar = "Value",
-                      groupvars=c("Spectra", "Life_form"))
-
-EWT_bias <- summarySE(EWT_all[Parameter == "Bias"], measurevar = "Value",
-                     groupvars=c("Spectra"))
-
-Fa <- ggplot() +
-  geom_errorbar(data= EWT_bias, aes(x = Spectra, ymax= Value, ymin= Value), colour = "grey20", linetype = 2) +  
-  geom_flat_violin(data = EWT[Parameter == "Bias"], aes(x = Spectra, y = Value, fill = Life_form), position = position_nudge(x = .1, y = 0), adjust = 1.5, trim = FALSE, alpha = .35, colour = "white") +
-  geom_point(data = EWT[Parameter == "Bias"], aes(x = as.numeric(Spectra)-.15, y = Value, colour = Life_form), position = position_jitter(width = .05), size = .25, shape = 20) +
-  geom_boxplot(data = EWT[Parameter == "Bias"], aes(x = Spectra, y = Value, fill = Life_form), outlier.shape = NA, alpha = .5, width = .1, colour = "black") +
-  geom_line(data = EWT_Bias, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form), linetype = 3) +
-  geom_point(data = EWT_Bias, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form), shape = 18) +
-  geom_errorbar(data = EWT_Bias, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form, ymin = Value-se, ymax = Value+se), width = .05) +    scale_colour_manual(values = c("Lianas" = '#33B09F', "Trees" = '#B66A34')) +
-  scale_fill_manual(values = c("Lianas" = '#33B09F', "Trees" = '#B66A34')) +
-  scale_y_continuous(limits = c(-0.06, 0.06), expand=c(0,0)) +
-  th + xlab("") + ylab("") + theme( axis.text.x = element_blank())
+A <- ggplot(ref_LMA, aes(x = mean, fill = Life_form)) +
+     geom_density(alpha = 0.2) +
+     scale_fill_manual(values = pa) +
+     scale_color_manual(values = pa) +
+     scale_x_continuous(limits = LMA_range, expand = c(0, 0)) +
+     theme_void() +
+     theme(legend.position = "none", plot.margin = margin(4, 6, 0, 0, "pt"))
 
 
-######----RMSE
-LMA_RMSE <- summarySE(LMA[Parameter == "RMSE"], measurevar = "Value",
-                      groupvars=c("Spectra", "Life_form"))
+B <- ggplot(cwt_LMA, aes(x = mean, fill = Life_form)) +
+  geom_density(alpha = 0.2) +
+  scale_fill_manual(values = pa) +
+  scale_color_manual(values = pa) +
+  scale_x_continuous(limits = LMA_range, expand = c(0, 0)) +
+  theme_void() +
+  theme(legend.position = "none", plot.margin = margin(4, 6, 0, 0, "pt"))
 
-LMA_rmse <- summarySE(LMA_all[Parameter == "RMSE"], measurevar = "Value",
-                     groupvars=c("Spectra"))
-
-G <- ggplot() +
-  geom_errorbar(data= LMA_rmse, aes(x = Spectra, ymax= Value, ymin= Value), colour = "grey20", linetype = 2) +  
-  geom_flat_violin(data = LMA[Parameter == "RMSE"], aes(x = Spectra, y = Value, fill = Life_form), position = position_nudge(x = .1, y = 0), adjust = 1.5, trim = FALSE, alpha = .35, colour = "white") +
-  geom_point(data = LMA[Parameter == "RMSE"], aes(x = as.numeric(Spectra)-.15, y = Value, colour = Life_form), position = position_jitter(width = .05), size = .25, shape = 20) +
-  geom_boxplot(data = LMA[Parameter == "RMSE"], aes(x = Spectra, y = Value, fill = Life_form), outlier.shape = NA, alpha = .5, width = .1, colour = "black") +
-  geom_line(data = LMA_RMSE, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form), linetype = 3) +
-  geom_point(data = LMA_RMSE, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form), shape = 18) +
-  geom_errorbar(data = LMA_RMSE, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form, ymin = Value-se, ymax = Value+se), width = .05) +    scale_colour_manual(values = c("Lianas" = '#33B09F', "Trees" = '#B66A34')) +
-  scale_fill_manual(values = c("Lianas" = '#33B09F', "Trees" = '#B66A34')) +
-  scale_y_continuous(limits = c(0, 33), expand=c(0,0)) +
-  th + xlab("") + ylab("") + theme( axis.text.x = element_blank())
-
-WC_RMSE <- summarySE(WC[Parameter == "RMSE"], measurevar = "Value",
-                     groupvars=c("Spectra", "Life_form"))
-
-WC_rmse <- summarySE(WC_all[Parameter == "RMSE"], measurevar = "Value",
-                     groupvars=c("Spectra"))
-
-H <- ggplot() +
-  geom_errorbar(data= WC_rmse, aes(x = Spectra, ymax= Value, ymin= Value), colour = "grey20", linetype = 2) +  
-  geom_flat_violin(data = WC[Parameter == "RMSE"], aes(x = Spectra, y = Value, fill = Life_form), position = position_nudge(x = .1, y = 0), adjust = 1.5, trim = FALSE, alpha = .35, colour = "white") +
-  geom_point(data = WC[Parameter == "RMSE"], aes(x = as.numeric(Spectra)-.15, y = Value, colour = Life_form), position = position_jitter(width = .05), size = .25, shape = 20) +
-  geom_boxplot(data = WC[Parameter == "RMSE"], aes(x = Spectra, y = Value, fill = Life_form), outlier.shape = NA, alpha = .5, width = .1, colour = "black") +
-  geom_line(data = WC_RMSE, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form), linetype = 3) +
-  geom_point(data = WC_RMSE, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form), shape = 18) +
-  geom_errorbar(data = WC_RMSE, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form, ymin = Value-se, ymax = Value+se), width = .05) +    scale_colour_manual(values = c("Lianas" = '#33B09F', "Trees" = '#B66A34')) +
-  scale_fill_manual(values = c("Lianas" = '#33B09F', "Trees" = '#B66A34')) +
-  scale_y_continuous(limits = c(2.5, 5), expand=c(0,0)) +
-  th + xlab("") + ylab("") + theme( axis.text.x = element_blank())
-
-EWT_RMSE <- summarySE(EWT[Parameter == "RMSE"], measurevar = "Value",
-                      groupvars=c("Spectra", "Life_form"))
-
-EWT_rmse <- summarySE(EWT_all[Parameter == "RMSE"], measurevar = "Value",
-                     groupvars=c("Spectra"))
-
-I <- ggplot() +
-  geom_errorbar(data= EWT_rmse, aes(x = Spectra, ymax= Value, ymin= Value), colour = "grey20", linetype = 2) +  
-  geom_flat_violin(data = EWT[Parameter == "RMSE"], aes(x = Spectra, y = Value, fill = Life_form), position = position_nudge(x = .1, y = 0), adjust = 1.5, trim = FALSE, alpha = .35, colour = "white") +
-  geom_point(data = EWT[Parameter == "RMSE"], aes(x = as.numeric(Spectra)-.15, y = Value, colour = Life_form), position = position_jitter(width = .05), size = .25, shape = 20) +
-  geom_boxplot(data = EWT[Parameter == "RMSE"], aes(x = Spectra, y = Value, fill = Life_form), outlier.shape = NA, alpha = .5, width = .1, colour = "black") +
-  geom_line(data = EWT_RMSE, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form), linetype = 3) +
-  geom_point(data = EWT_RMSE, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form), shape = 18) +
-  geom_errorbar(data = EWT_RMSE, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form, ymin = Value-se, ymax = Value+se), width = .05) +    scale_colour_manual(values = c("Lianas" = '#33B09F', "Trees" = '#B66A34')) +
-  scale_fill_manual(values = c("Lianas" = '#33B09F', "Trees" = '#B66A34')) +
-  scale_y_continuous(limits = c(10, 40), expand=c(0,0)) +
-  th + xlab("") + ylab("") + theme( axis.text.x = element_blank())
-
-######----RMSE_P
-LMA_RMSE_P <- summarySE(LMA[Parameter == "RMSE_P"], measurevar = "Value",
-                        groupvars=c("Spectra", "Life_form"))
-
-LMA_rmsep <- summarySE(LMA_all[Parameter == "RMSE_P"], measurevar = "Value",
-                     groupvars=c("Spectra"))
-
-J <- ggplot() +
-  geom_errorbar(data= LMA_rmsep, aes(x = Spectra, ymax= Value, ymin= Value), colour = "grey20", linetype = 2) +  
-  geom_flat_violin(data = LMA[Parameter == "RMSE_P"], aes(x = Spectra, y = Value, fill = Life_form), position = position_nudge(x = .1, y = 0), adjust = 1.5, trim = FALSE, alpha = .35, colour = "white") +
-  geom_point(data = LMA[Parameter == "RMSE_P"], aes(x = as.numeric(Spectra)-.15, y = Value, colour = Life_form), position = position_jitter(width = .05), size = .25, shape = 20) +
-  geom_boxplot(data = LMA[Parameter == "RMSE_P"], aes(x = Spectra, y = Value, fill = Life_form), outlier.shape = NA, alpha = .5, width = .1, colour = "black") +
-  geom_line(data = LMA_RMSE_P, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form), linetype = 3) +
-  geom_point(data = LMA_RMSE_P, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form), shape = 18) +
-  geom_errorbar(data = LMA_RMSE_P, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form, ymin = Value-se, ymax = Value+se), width = .05) +    scale_colour_manual(values = c("Lianas" = '#33B09F', "Trees" = '#B66A34')) +
-  scale_fill_manual(values = c("Lianas" = '#33B09F', "Trees" = '#B66A34')) +
-  scale_y_continuous(limits = c(3, 17.5), expand=c(0,0)) +
-  th + xlab("") + ylab("") + theme( axis.text.x = element_blank())
-
-WC_RMSE_P <- summarySE(WC[Parameter == "RMSE_P"], measurevar = "Value",
-                       groupvars=c("Spectra", "Life_form"))
-
-WC_rmsep <- summarySE(WC_all[Parameter == "RMSE_P"], measurevar = "Value",
-                     groupvars=c("Spectra"))
-
-K <- ggplot() +
-  geom_errorbar(data= WC_rmsep, aes(x = Spectra, ymax= Value, ymin= Value), colour = "grey20", linetype = 2) +  
-  geom_flat_violin(data = WC[Parameter == "RMSE_P"], aes(x = Spectra, y = Value, fill = Life_form), position = position_nudge(x = .1, y = 0), adjust = 1.5, trim = FALSE, alpha = .35, colour = "white") +
-  geom_point(data = WC[Parameter == "RMSE_P"], aes(x = as.numeric(Spectra)-.15, y = Value, colour = Life_form), position = position_jitter(width = .05), size = .25, shape = 20) +
-  geom_boxplot(data = WC[Parameter == "RMSE_P"], aes(x = Spectra, y = Value, fill = Life_form), outlier.shape = NA, alpha = .5, width = .1, colour = "black") +
-  geom_line(data = WC_RMSE_P, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form), linetype = 3) +
-  geom_point(data = WC_RMSE_P, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form), shape = 18) +
-  geom_errorbar(data = WC_RMSE_P, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form, ymin = Value-se, ymax = Value+se), width = .05) +    scale_colour_manual(values = c("Lianas" = '#33B09F', "Trees" = '#B66A34')) +
-  scale_fill_manual(values = c("Lianas" = '#33B09F', "Trees" = '#B66A34')) +
-  scale_y_continuous(limits = c(7, 12.5), expand=c(0,0)) +
-  th + xlab("") + ylab("") + theme( axis.text.x = element_blank())
-
-EWT_RMSE_P <- summarySE(EWT[Parameter == "RMSE_P"], measurevar = "Value",
-                        groupvars=c("Spectra", "Life_form"))
-
-EWT_rmsep <- summarySE(EWT_all[Parameter == "RMSE_P"], measurevar = "Value",
-                     groupvars=c("Spectra"))
-
-L <- ggplot() +
-  geom_errorbar(data= EWT_rmsep, aes(x = Spectra, ymax= Value, ymin= Value), colour = "grey20", linetype = 2) +  
-  geom_flat_violin(data = EWT[Parameter == "RMSE_P"], aes(x = Spectra, y = Value, fill = Life_form), position = position_nudge(x = .1, y = 0), adjust = 1.5, trim = FALSE, alpha = .35, colour = "white") +
-  geom_point(data = EWT[Parameter == "RMSE_P"], aes(x = as.numeric(Spectra)-.15, y = Value, colour = Life_form), position = position_jitter(width = .05), size = .25, shape = 20) +
-  geom_boxplot(data = EWT[Parameter == "RMSE_P"], aes(x = Spectra, y = Value, fill = Life_form), outlier.shape = NA, alpha = .5, width = .1, colour = "black") +
-  geom_line(data = EWT_RMSE_P, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form), linetype = 3) +
-  geom_point(data = EWT_RMSE_P, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form), shape = 18) +
-  geom_errorbar(data = EWT_RMSE_P, aes(x = as.numeric(Spectra)+.1, y = Value, group = Life_form, colour = Life_form, ymin = Value-se, ymax = Value+se), width = .05) +    scale_colour_manual(values = c("Lianas" = '#33B09F', "Trees" = '#B66A34')) +
-  scale_fill_manual(values = c("Lianas" = '#33B09F', "Trees" = '#B66A34')) +
-  scale_y_continuous(limits = c(7.5, 17.5), expand=c(0,0)) +
-  th + xlab("") + ylab("") + theme( axis.text.x = element_blank())
+C <- ggplot(ref_LMA, aes(x = mean, y = LMA, fill = Life_form, colour = Life_form)) +
+     geom_abline(intercept = 0, slope = 1, color= "grey", linetype= "solid", size= 0.3)+
+     geom_errorbarh(aes(xmin = sd_lower, xmax = sd_upper, height = 0, colour = Life_form), alpha = 0.2) +
+     geom_point(shape = 21, color = "white", size = size_point, alpha = 0.8) + 
+     geom_smooth(method='lm', formula = y ~ x, se = FALSE, size = 0.5) + 
+     scale_fill_manual(values= pa) +
+     scale_color_manual(values= pa) +
+     scale_x_continuous(limits = LMA_range, expand = c(0, 0), breaks = c(0, 50, 100, 150, 200, 250, 300), labels = c("", 50, "", 150, "", 250, "")) +
+     scale_y_continuous(limits = LMA_range, expand = c(0, 0), breaks = c(0, 50, 100, 150, 200, 250, 300), labels = c("", 50, "", 150, "", 250, "")) +
+     xlab(expression(paste("Predicted LMA (g m"^-2, ")", sep = "")))  +   
+     ylab(expression(paste("Observed LMA (g m"^-2, ")", sep = "")))  +
+     geom_line(aes(x = mean, y = lwr, colour = Life_form), linetype = "dashed", size= 0.3) +
+     geom_line(aes(x = mean, y = upr, colour = Life_form), linetype = "dashed", size= 0.3) +
+     th
 
 
-tiff("Figure_S6a.tif", width = 21, height = 21, units = "cm", res = 600)
-ggarrange(A, B, C,
-          D, E, Fa,
-          G, H, I,
-          J, K, L,
-          labels = c("a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l"), 
-          font.label = list(size = 15, color = "black", face = "plain", family = NULL),
-          label.x = 0.24,
-          label.y = 0.99,
-          ncol = 3, nrow = 4,  align = "hv",
-          widths = c(2, 2, 2),
-          heights = c(2, 2, 2, 2),
-          common.legend = TRUE)
+D <- ggplot(cwt_LMA, aes(x = mean, y = LMA, fill = Life_form, colour = Life_form)) +
+  geom_abline(intercept = 0, slope = 1, color= "grey", linetype= "solid", size= 0.3)+
+  geom_errorbarh(aes(xmin = sd_lower, xmax = sd_upper, height = 0, colour = Life_form), alpha = 0.2) +
+  geom_point(shape = 21, color = "white", size = size_point, alpha = 0.8) + 
+  geom_smooth(method='lm', formula = y ~ x, se = FALSE, size = 0.5) + 
+  scale_fill_manual(values= pa) +
+  scale_color_manual(values= pa) +
+  scale_x_continuous(limits = LMA_range, expand = c(0, 0), breaks = c(0, 50, 100, 150, 200, 250, 300), labels = c("", 50, "", 150, "", 250, "")) +
+  scale_y_continuous(limits = LMA_range, expand = c(0, 0), breaks = c(0, 50, 100, 150, 200, 250, 300), labels = c("", 50, "", 150, "", 250, "")) +
+  xlab(expression(paste("Predicted LMA (g m"^-2, ")", sep = "")))  +   
+  ylab(expression(paste("Observed LMA (g m"^-2, ")", sep = "")))  +
+  geom_line(aes(x = mean, y = lwr, colour = Life_form), linetype = "dashed", size= 0.3) +
+  geom_line(aes(x = mean, y = upr, colour = Life_form), linetype = "dashed", size= 0.3) +
+  th + ylab("")
+
+E <- ggplot(cwt_LMA, aes(x = LMA, fill = Life_form)) +
+  geom_density(alpha = 0.2) +
+  scale_fill_manual(values = pa) +
+  scale_color_manual(values = pa) +
+  scale_x_continuous(limits = LMA_range, expand = c(0, 0)) +
+  theme_void() +
+  theme(legend.position = "none", plot.margin = margin(4, 6, 0, 0, "pt")) + rotate()
+
+
+Fa <- ggplot(ref_WC, aes(x = mean, fill = Life_form)) +
+  geom_density(alpha = 0.2) +
+  scale_fill_manual(values = pa) +
+  scale_color_manual(values = pa) +
+  scale_x_continuous(limits = WC_range, expand = c(0, 0)) +
+  theme_void() +
+  theme(legend.position = "none", plot.margin = margin(4, 6, 0, 0, "pt"))
+
+G <- ggplot(cwt_WC, aes(x = mean, fill = Life_form)) +
+  geom_density(alpha = 0.2) +
+  scale_fill_manual(values = pa) +
+  scale_color_manual(values = pa) +
+  scale_x_continuous(limits = WC_range, expand = c(0, 0)) +
+  theme_void() +
+  theme(legend.position = "none", plot.margin = margin(4, 6, 0, 0, "pt"))
+
+H <- ggplot(ref_WC, aes(x = mean, y = WC, fill = Life_form, colour = Life_form)) +
+  geom_abline(intercept = 0, slope = 1, color= "grey", linetype= "solid", size= 0.3)+
+  geom_errorbarh(aes(xmin = sd_lower, xmax = sd_upper, height = 0, colour = Life_form), alpha = 0.2) +
+  geom_point(shape = 21, color = "white", size = size_point, alpha = 0.8) + 
+  geom_smooth(method='lm', formula = y ~ x, se = FALSE, size = 0.5) + 
+  scale_fill_manual(values= pa) +
+  scale_color_manual(values= pa) +
+  scale_x_continuous(limits = WC_range, expand = c(0, 0), breaks = c(40, 50, 60, 70, 80, 90), labels = c("", 50, "", 70, "", 90)) +
+  scale_y_continuous(limits = WC_range, expand = c(0, 0), breaks = c(40, 50, 60, 70, 80, 90), labels = c("", 50, "", 70, "", 90)) +
+  xlab(expression(paste("Predicted WC (%)", sep = "")))  +   
+  ylab(expression(paste("Observed WC (%)", sep = "")))  +
+  geom_line(aes(x = mean, y = lwr, colour = Life_form), linetype = "dashed", size= 0.3) +
+  geom_line(aes(x = mean, y = upr, colour = Life_form), linetype = "dashed", size= 0.3) +
+  th
+
+I <- ggplot(cwt_WC, aes(x = mean, y = WC, fill = Life_form, colour = Life_form)) +
+  geom_abline(intercept = 0, slope = 1, color= "grey", linetype= "solid", size= 0.3)+
+  geom_errorbarh(aes(xmin = sd_lower, xmax = sd_upper, height = 0, colour = Life_form), alpha = 0.2) +
+  geom_point(shape = 21, color = "white", size = size_point, alpha = 0.8) + 
+  geom_smooth(method='lm', formula = y ~ x, se = FALSE, size = 0.5) + 
+  scale_fill_manual(values= pa) +
+  scale_color_manual(values= pa) +
+  scale_x_continuous(limits = WC_range, expand = c(0, 0), breaks = c(40, 50, 60, 70, 80, 90), labels = c("", 50, "", 70, "", 90)) +
+  scale_y_continuous(limits = WC_range, expand = c(0, 0), breaks = c(40, 50, 60, 70, 80, 90), labels = c("", 50, "", 70, "", 90)) +
+  xlab(expression(paste("Predicted WC (%)", sep = "")))  +   
+  ylab(expression(paste("Observed WC (%)", sep = "")))  +
+  geom_line(aes(x = mean, y = lwr, colour = Life_form), linetype = "dashed", size= 0.3) +
+  geom_line(aes(x = mean, y = upr, colour = Life_form), linetype = "dashed", size= 0.3) +
+  th + ylab("")
+
+J <- ggplot(cwt_WC, aes(x = WC, fill = Life_form)) +
+  geom_density(alpha = 0.2) +
+  scale_fill_manual(values = pa) +
+  scale_color_manual(values = pa) +
+  scale_x_continuous(limits = WC_range, expand = c(0, 0)) +
+  theme_void() +
+  theme(legend.position = "none", plot.margin = margin(4, 6, 0, 0, "pt")) + rotate()
+
+K <- ggplot(ref_EWT, aes(x = mean, fill = Life_form)) +
+  geom_density(alpha = 0.2) +
+  scale_fill_manual(values = pa) +
+  scale_color_manual(values = pa) +
+  scale_x_continuous(limits = EWT_range, expand = c(0, 0)) +
+  theme_void() +
+  theme(legend.position = "none", plot.margin = margin(4, 6, 0, 0, "pt"))
+
+L <- ggplot(cwt_EWT, aes(x = mean, fill = Life_form)) +
+  geom_density(alpha = 0.2) +
+  scale_fill_manual(values = pa) +
+  scale_color_manual(values = pa) +
+  scale_x_continuous(limits = EWT_range, expand = c(0, 0)) +
+  theme_void() +
+  theme(legend.position = "none", plot.margin = margin(4, 6, 0, 0, "pt"))
+
+M <- ggplot(ref_EWT, aes(x = mean, y = EWT, fill = Life_form, colour = Life_form)) +
+  geom_abline(intercept = 0, slope = 1, color= "grey", linetype= "solid", size= 0.3)+
+  geom_errorbarh(aes(xmin = sd_lower, xmax = sd_upper, height = 0, colour = Life_form), alpha = 0.2) +
+  geom_point(shape = 21, color = "white", size = size_point, alpha = 0.8) + 
+  geom_smooth(method='lm', formula = y ~ x, se = FALSE, size = 0.5) + 
+  scale_fill_manual(values= pa) +
+  scale_color_manual(values= pa) +
+  scale_x_continuous(limits = EWT_range, expand = c(0, 0), breaks = c(0, 75, 150, 225, 300, 375), labels = c(0, "", 150, "", 300, "")) +
+  scale_y_continuous(limits = EWT_range, expand = c(0, 0), breaks = c(0, 75, 150, 225, 300, 375), labels = c(0, "", 150, "", 300, "")) +
+  xlab(expression(paste("Predicted EWT (g m"^-2, ")", sep = "")))  +   
+  ylab(expression(paste("Observed EWT (g m"^-2, ")", sep = "")))  +
+  geom_line(aes(x = mean, y = lwr, colour = Life_form), linetype = "dashed", size= 0.3) +
+  geom_line(aes(x = mean, y = upr, colour = Life_form), linetype = "dashed", size= 0.3) +
+  th
+
+N <- ggplot(cwt_EWT, aes(x = mean, y = EWT, fill = Life_form, colour = Life_form)) +
+  geom_abline(intercept = 0, slope = 1, color= "grey", linetype= "solid", size= 0.3)+
+  geom_errorbarh(aes(xmin = sd_lower, xmax = sd_upper, height = 0, colour = Life_form), alpha = 0.2) +
+  geom_point(shape = 21, color = "white", size = size_point, alpha = 0.8) + 
+  geom_smooth(method='lm', formula = y ~ x, se = FALSE, size = 0.5) + 
+  scale_fill_manual(values= pa) +
+  scale_color_manual(values= pa) +
+  scale_x_continuous(limits = EWT_range, expand = c(0, 0), breaks = c(0, 75, 150, 225, 300, 375), labels = c(0, "", 150, "", 300, "")) +
+  scale_y_continuous(limits = EWT_range, expand = c(0, 0), breaks = c(0, 75, 150, 225, 300, 375), labels = c(0, "", 150, "", 300, "")) +
+  xlab(expression(paste("Predicted EWT (g m"^-2, ")", sep = "")))  +   
+  ylab(expression(paste("Observed EWT (g m"^-2, ")", sep = "")))  +
+  geom_line(aes(x = mean, y = lwr, colour = Life_form), linetype = "dashed", size= 0.3) +
+  geom_line(aes(x = mean, y = upr, colour = Life_form), linetype = "dashed", size= 0.3) +
+  th + ylab("")
+
+O <- ggplot(cwt_EWT, aes(x = EWT, fill = Life_form)) +
+  geom_density(alpha = 0.2) +
+  scale_fill_manual(values = pa) +
+  scale_color_manual(values = pa) +
+  scale_x_continuous(limits = EWT_range, expand = c(0, 0)) +
+  theme_void() +
+  theme(legend.position = "none", plot.margin = margin(4, 6, 0, 0, "pt")) + rotate()
+
+
+Figure_S5 <- ggarrange(A, B, NULL, 
+                       C, D, E,
+                       Fa, G, NULL,
+                       H, I, J,
+                       K, L, NULL,
+                       M, N, O,
+                       labels = c("", "", "", "a", "b", "", "", "", "", "c", "d", "", "", "", "", "e", "f", ""), 
+                       font.label = list(size = 15, color = "black", face = "plain", family = NULL),
+                       label.x = 0.22,
+                       label.y = 0.99,
+                       ncol = 3, nrow = 6,  align = "hv", 
+                       widths = c(2.5, 2.5, 1), 
+                       heights = c(1, 2.5, 1, 2.5, 1, 2.5),
+                       common.legend = TRUE)
+
+tiff("Figure_S6.tif", width = 20, height = 25, units = "cm", res = 600)
+
+Figure_S5
+
 dev.off()
+     

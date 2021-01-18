@@ -12,9 +12,9 @@ library(ggpubr)
 library(PupillometryR)
 
 ####Select and prepare data
-training <- fread("traits_training.csv")
+training <- fread("/home/antguz/Documents/PLSR-models/Data/03-spectra/traits_training.csv")
 training$Process <- "Training"
-testing <- fread("traits_testing.csv")
+testing <- fread("/home/antguz/Documents/PLSR-models/Data/03-spectra/traits_testing.csv")
 testing$Process <- "Testing"
 
 data <- rbind(training, testing)
@@ -22,14 +22,16 @@ colnames(data)[3:5] <- c("LMA", "WC", "EWT")
 data$LMA <- 10^data$LMA
 data$WC <- 10^data$WC
 data$EWT <- 10^data$EWT
-data$Life_form <- as.factor(data$Life_form)
-data$Life_form <- factor(data$Life_form, levels = c("Liana", "Tree"))
+data[Life_form == "Tree", Life_form := "Trees"]
+data[Life_form == "Liana", Life_form := "Lianas"]
 
+data$Life_form <- as.factor(data$Life_form)
+data$Life_form <- factor(data$Life_form, levels = c("Lianas", "Trees"))
 
 data$Process <- as.factor(data$Process)
 data$Process <- factor(data$Process, levels = c("Training", "Testing"))
 
-pa <- c("#33B09F", "#B66A34")
+pa <- c("#e66101", "#5e3c99")
 tamano <- 12
 tamano2 <- 10
 mar <- theme(plot.margin = margin(0, 0, 0, 0, "pt"))
@@ -55,7 +57,8 @@ LMA <- ggplot() +
   geom_flat_violin(data = data, aes(x = Life_form, y = LMA, fill = Process), position = position_nudge(x = .1, y = 0), adjust = 1.5, trim = FALSE, alpha = .15, colour = "white") +
   geom_point(data = data, aes(x = as.numeric(Life_form)-.15, y = LMA, colour = Process), position = position_jitter(width = .05), size = .25, shape = 20) +
   geom_boxplot(data = data, aes(x = Life_form, y = LMA, fill = Process), outlier.shape = NA, alpha = .5, width = .1, colour = "black") +
-  scale_fill_manual(values = c("Training" = '#33B09F', "Testing" = '#B66A34')) +
+  scale_fill_manual(values = c("Training" = pa[1], "Testing" = pa[2])) +
+  scale_colour_manual(values = c("Training" = pa[1], "Testing" = pa[2])) +
   scale_y_continuous(trans = log10_trans()) +
   annotation_logticks(sides = "l") +
   ylab(  expression(paste("LMA (g m"^-2, ")", sep = "")))  +
@@ -68,7 +71,8 @@ WC <- ggplot() +
   geom_flat_violin(data = data, aes(x = Life_form, y = WC, fill = Process), position = position_nudge(x = .1, y = 0), adjust = 1.5, trim = FALSE, alpha = .15, colour = "white") +
   geom_point(data = data, aes(x = as.numeric(Life_form)-.15, y = WC, colour = Process), position = position_jitter(width = .05), size = .25, shape = 20) +
   geom_boxplot(data = data, aes(x = Life_form, y = WC, fill = Process), outlier.shape = NA, alpha = .5, width = .1, colour = "black") +
-  scale_fill_manual(values = c("Training" = '#33B09F', "Testing" = '#B66A34')) +
+  scale_fill_manual(values = c("Training" = pa[1], "Testing" = pa[2])) +
+  scale_colour_manual(values = c("Training" = pa[1], "Testing" = pa[2])) +
   scale_y_continuous(trans = log10_trans()) +
   annotation_logticks(sides = "l") +
   ylab(  expression(paste("WC (%)", sep = "")))  +
@@ -81,7 +85,8 @@ EWT <- ggplot() +
   geom_flat_violin(data = data, aes(x = Life_form, y = EWT, fill = Process), position = position_nudge(x = .1, y = 0), adjust = 1.5, trim = FALSE, alpha = .15, colour = "white") +
   geom_point(data = data, aes(x = as.numeric(Life_form)-.15, y = EWT, colour = Process), position = position_jitter(width = .05), size = .25, shape = 20) +
   geom_boxplot(data = data, aes(x = Life_form, y = EWT, fill = Process), outlier.shape = NA, alpha = .5, width = .1, colour = "black") +
-  scale_fill_manual(values = c("Training" = '#33B09F', "Testing" = '#B66A34')) +
+  scale_fill_manual(values = c("Training" = pa[1], "Testing" = pa[2])) +
+  scale_colour_manual(values = c("Training" = pa[1], "Testing" = pa[2])) +
   scale_y_continuous(trans = log10_trans()) +
   annotation_logticks(sides = "l") +
   ylab(  expression(paste("EWT (g m"^-2, ")", sep = "")))  +

@@ -1,5 +1,5 @@
 ###############################################################
-###Figure S8
+###Figure S9
 ###############################################################
 
 #Note: inputs come from code_base.R
@@ -10,11 +10,11 @@ library(ggpubr)
 library(ggplot2)
 
 #Load and prepare data
-LMA <- fread("/home/antguz/Documents/PLSR-models/Data/04-results/08-Residuals_train/LMA_residuals_training.csv")
+LMA <- fread("/home/antguz/Documents/PLSR-models/Data/04-results/09-Residuals_test/LMA_residuals_testing.csv")
 LMA[Spectra == "CWT", Spectra := "Wavelet"]
-WC <- fread("/home/antguz/Documents/PLSR-models/Data/04-results/08-Residuals_train/WC_residuals_training.csv")
+WC <- fread("/home/antguz/Documents/PLSR-models/Data/04-results/09-Residuals_test/WC_residuals_testing.csv")
 WC[Spectra == "CWT", Spectra := "Wavelet"]
-EWT <- fread("/home/antguz/Documents/PLSR-models/Data/04-results/08-Residuals_train/EWT_residuals_training.csv")
+EWT <- fread("/home/antguz/Documents/PLSR-models/Data/04-results/09-Residuals_test/EWT_residuals_testing.csv")
 EWT[Spectra == "CWT", Spectra := "Wavelet"]
 
 #Data manage
@@ -40,7 +40,7 @@ colnames(EWT)[3:5] <- c("mean", "sd_lower", "sd_upper")
 EWT <- EWT[order(Spectra, variable)]
 
 #Traits
-observed <- fread("/home/antguz/Documents/PLSR-models/Data/03-spectra/traits_training.csv")
+observed <- fread("/home/antguz/Documents/PLSR-models/Data/03-spectra/traits_testing.csv")
 colnames(observed)[3:5] <- c("LMA", "WC", "EWT")
 observed$LMA <- 10^observed$LMA
 observed$WC <- 10^observed$WC
@@ -169,7 +169,7 @@ ref_c <- ggplot(ref_EWT, aes(x = EWT, y = mean, fill = Life_form, colour = Life_
   scale_fill_manual(values= pa) +
   scale_color_manual(values= pa) +
   scale_x_continuous(limits = EWT_range, expand = c(0, 0)) +
-  scale_y_continuous(limits = c(-100, 100), expand = c(0, 0), breaks = c(-100, -50, 0, 50, 100), labels = c(-100, "", 0, "", 100)) +
+  scale_y_continuous(limits = c(-100, 100), expand = c(0, 0)) +
   xlab(expression(paste("Observed EWT (g m"^-2, ")", sep = "")))  +   
   ylab(expression(paste("EWT Residuals", sep = "")))  +
   th
@@ -229,7 +229,7 @@ cwt_c <- ggplot(cwt_EWT, aes(x = EWT, y = mean, fill = Life_form, colour = Life_
   scale_fill_manual(values= pa) +
   scale_color_manual(values= pa) +
   scale_x_continuous(limits = EWT_range, expand = c(0, 0)) +
-  scale_y_continuous(limits = c(-100, 100), expand = c(0, 0), breaks = c(-100, -50, 0, 50, 100), labels = c(-100, "", 0, "", 100)) +
+  scale_y_continuous(limits = c(-100, 100), expand = c(0, 0)) +
   xlab(expression(paste("Observed EWT (g m"^-2, ")", sep = "")))  +   
   ylab(expression(paste("EWT Residuals", sep = "")))  +
   th
@@ -242,7 +242,7 @@ cwt_c_l <- ggplot(cwt_EWT, aes(x= mean, fill= Life_form)) +
   theme_void() +
   theme(legend.position = "none", plot.margin = margin(4, 6, 0, 0, "pt")) + rotate()
 
-tiff("Figure_S8.tif", width = 21, height = 11.67, units = "cm", res = 600)
+tiff("Figure_S9.tif", width = 21, height = 11.67, units = "cm", res = 600)
 
 ggarrange(hist_a, NULL, hist_b, NULL, hist_c, NULL,
           ref_a, ref_a_l, ref_b, ref_b_l, ref_c, ref_c_l,
@@ -257,4 +257,3 @@ ggarrange(hist_a, NULL, hist_b, NULL, hist_c, NULL,
           common.legend = TRUE)
 
 dev.off()
-

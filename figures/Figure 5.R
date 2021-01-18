@@ -13,40 +13,51 @@ library(ggExtra)
 library(plyr)
 
 ###Data and preparations
-ref_LMA_predict <- fread("ref_LMA_predict_test.csv")
-ref_WC_predict <- fread("ref_WC_predict_test.csv")
-ref_EWT_predict <- fread("ref_EWT_predict_test.csv")
-cwt_LMA_predict <- fread("cwt_LMA_predict_test.csv")
-cwt_WC_predict <- fread("cwt_WC_predict_test.csv")
-cwt_EWT_predict <- fread("cwt_EWT_predict_test.csv")
+LMA_predict <- fread("/home/antguz/Documents/PLSR-models/Data/04-results/07-Predict_test/LMA_predict_testing.csv")
+LMA_predict[Spectra == "CWT", Spectra := "Wavelet"]
+WC_predict <- fread("/home/antguz/Documents/PLSR-models/Data/04-results/07-Predict_test/WC_predict_testing.csv")
+WC_predict[Spectra == "CWT", Spectra := "Wavelet"]
+EWT_predict <- fread("/home/antguz/Documents/PLSR-models/Data/04-results/07-Predict_test/EWT_predict_testing.csv")
+EWT_predict[Spectra == "CWT", Spectra := "Wavelet"]
 
-summary_data <- function(x) {
-  y <- x
-  mean <- mean(y)
-  sd_lower <- mean - sd(y)
-  sd_upper <- mean + sd(y)
-  return(c(sd_upper = sd_upper, mean = mean, sd_lower = sd_lower))
-}
+###Data manage
+LMA  <- melt(LMA_predict, id.vars=c("Spectra", "iteration"),
+                 measure.vars = .SD,
+                 value.name = "Trait")
+LMA <- LMA[, list(mean(Trait), (mean(Trait) - sd(Trait)), (mean(Trait) + sd(Trait))), by = c("Spectra", "variable")]
+colnames(LMA)[3:5] <- c("mean", "sd_lower", "sd_upper")
+LMA <- LMA[order(Spectra, variable)]
 
-ref_LMA_sum <- as.data.table(t(apply(ref_LMA_predict, 1, summary_data)))
-ref_WC_sum <- as.data.table(t(apply(ref_WC_predict, 1, summary_data)))
-ref_EWT_sum <- as.data.table(t(apply(ref_EWT_predict, 1, summary_data)))
-cwt_LMA_sum <- as.data.table(t(apply(cwt_LMA_predict, 1, summary_data)))
-cwt_WC_sum <- as.data.table(t(apply(cwt_WC_predict, 1, summary_data)))
-cwt_EWT_sum <- as.data.table(t(apply(cwt_EWT_predict, 1, summary_data)))
+WC  <- melt(WC_predict, id.vars=c("Spectra", "iteration"),
+             measure.vars = .SD,
+             value.name = "Trait")
+WC <- WC[, list(mean(Trait), (mean(Trait) - sd(Trait)), (mean(Trait) + sd(Trait))), by = c("Spectra", "variable")]
+colnames(WC)[3:5] <- c("mean", "sd_lower", "sd_upper")
+WC <- WC[order(Spectra, variable)]
 
-observed <- fread("traits_testing.csv")
+EWT  <- melt(EWT_predict, id.vars=c("Spectra", "iteration"),
+             measure.vars = .SD,
+             value.name = "Trait")
+EWT <- EWT[, list(mean(Trait), (mean(Trait) - sd(Trait)), (mean(Trait) + sd(Trait))), by = c("Spectra", "variable")]
+colnames(EWT)[3:5] <- c("mean", "sd_lower", "sd_upper")
+EWT <- EWT[order(Spectra, variable)]
+
+observed <- fread("/home/antguz/Documents/PLSR-models/Data/03-spectra/traits_testing.csv")
 colnames(observed)[3:5] <- c("LMA", "WC", "EWT")
 observed$LMA <- 10^observed$LMA
 observed$WC <- 10^observed$WC
 observed$EWT <- 10^observed$EWT
+observed[Life_form == "Tree", Life_form := "Trees"]
+observed[Life_form == "Liana", Life_form := "Lianas"]
+observed$Life_form <- as.factor(observed$Life_form)
+observed$Life_form <- factor(observed$Life_form, levels = c("Lianas", "Trees"))
 
-ref_LMA <- cbind(observed[,c(1,3)], ref_LMA_sum)
-ref_WC <- cbind(observed[,c(1,4)], ref_WC_sum)
-ref_EWT <- cbind(observed[,c(1,5)], ref_EWT_sum) 
-cwt_LMA <- cbind(observed[,c(1,3)], cwt_LMA_sum)
-cwt_WC <- cbind(observed[,c(1,4)], cwt_WC_sum)
-cwt_EWT <- cbind(observed[,c(1,5)], cwt_EWT_sum)
+ref_LMA <- cbind(observed[,c(1,3)], LMA[Spectra == "Reflectance"])
+ref_WC <- cbind(observed[,c(1,4)], WC[Spectra == "Reflectance"])
+ref_EWT <- cbind(observed[,c(1,5)], EWT[Spectra == "Reflectance"]) 
+cwt_LMA <- cbind(observed[,c(1,3)], LMA[Spectra == "Wavelet"])
+cwt_WC <- cbind(observed[,c(1,4)], WC[Spectra == "Wavelet"])
+cwt_EWT <- cbind(observed[,c(1,5)], EWT[Spectra == "Wavelet"])
 
 ref_LMA[, c("fit", "lwr", "upr") := as.data.table((predict(lm(LMA ~ mean, .SD), newdata = .SD, interval = "prediction"))), by = "Life_form"]
 ref_WC[, c("fit", "lwr", "upr") := as.data.table((predict(lm(WC ~ mean, .SD), newdata = .SD, interval = "prediction"))), by = "Life_form"]
@@ -57,9 +68,9 @@ cwt_EWT[, c("fit", "lwr", "upr") := as.data.table((predict(lm(EWT ~ mean, .SD), 
 
 
 #Parameters for figure
-pa <- c("#33B09F", "#B66A34")
-tamano <- 12
-tamano2 <- 10
+pa <- c("#e66101", "#5e3c99")
+tamano <- 13
+tamano2 <- 12
 
 th <- theme_bw(base_size = tamano) + theme(plot.background = element_blank(),
                                            panel.grid.major = element_blank(),
@@ -71,9 +82,9 @@ th <- theme_bw(base_size = tamano) + theme(plot.background = element_blank(),
                                            strip.text.y = element_text(size = tamano, color = "black"),
                                            strip.background = element_rect(color= "black", fill="grey90", linetype="solid"))
 
-LMA_range <- c(0, 300)
+LMA_range <- c(0, 315)
 WC_range <- c(40, 95)
-EWT_range <- c(20, 450)
+EWT_range <- c(0, 410)
 size_point <- 1.5
 
 A <- ggplot(ref_LMA, aes(x = mean, fill = Life_form)) +
@@ -100,8 +111,8 @@ C <- ggplot(ref_LMA, aes(x = mean, y = LMA, fill = Life_form, colour = Life_form
      geom_smooth(method='lm', formula = y ~ x, se = FALSE, size = 0.5) + 
      scale_fill_manual(values= pa) +
      scale_color_manual(values= pa) +
-     scale_x_continuous(limits = LMA_range, expand = c(0, 0)) +
-     scale_y_continuous(limits = LMA_range, expand = c(0, 0)) +
+     scale_x_continuous(limits = LMA_range, expand = c(0, 0), breaks = c(0, 50, 100, 150, 200, 250, 300), labels = c("", 50, "", 150, "", 250, "")) +
+     scale_y_continuous(limits = LMA_range, expand = c(0, 0), breaks = c(0, 50, 100, 150, 200, 250, 300), labels = c("", 50, "", 150, "", 250, "")) +
      xlab(expression(paste("Predicted LMA (g m"^-2, ")", sep = "")))  +   
      ylab(expression(paste("Observed LMA (g m"^-2, ")", sep = "")))  +
      geom_line(aes(x = mean, y = lwr, colour = Life_form), linetype = "dashed", size= 0.3) +
@@ -116,13 +127,13 @@ D <- ggplot(cwt_LMA, aes(x = mean, y = LMA, fill = Life_form, colour = Life_form
   geom_smooth(method='lm', formula = y ~ x, se = FALSE, size = 0.5) + 
   scale_fill_manual(values= pa) +
   scale_color_manual(values= pa) +
-  scale_x_continuous(limits = LMA_range, expand = c(0, 0)) +
-  scale_y_continuous(limits = LMA_range, expand = c(0, 0)) +
+  scale_x_continuous(limits = LMA_range, expand = c(0, 0), breaks = c(0, 50, 100, 150, 200, 250, 300), labels = c("", 50, "", 150, "", 250, "")) +
+  scale_y_continuous(limits = LMA_range, expand = c(0, 0), breaks = c(0, 50, 100, 150, 200, 250, 300), labels = c("", 50, "", 150, "", 250, "")) +
   xlab(expression(paste("Predicted LMA (g m"^-2, ")", sep = "")))  +   
   ylab(expression(paste("Observed LMA (g m"^-2, ")", sep = "")))  +
   geom_line(aes(x = mean, y = lwr, colour = Life_form), linetype = "dashed", size= 0.3) +
   geom_line(aes(x = mean, y = upr, colour = Life_form), linetype = "dashed", size= 0.3) +
-  th
+  th + ylab("")
 
 E <- ggplot(cwt_LMA, aes(x = LMA, fill = Life_form)) +
   geom_density(alpha = 0.2) +
@@ -156,8 +167,8 @@ H <- ggplot(ref_WC, aes(x = mean, y = WC, fill = Life_form, colour = Life_form))
   geom_smooth(method='lm', formula = y ~ x, se = FALSE, size = 0.5) + 
   scale_fill_manual(values= pa) +
   scale_color_manual(values= pa) +
-  scale_x_continuous(limits = WC_range, expand = c(0, 0)) +
-  scale_y_continuous(limits = WC_range, expand = c(0, 0)) +
+  scale_x_continuous(limits = WC_range, expand = c(0, 0), breaks = c(40, 50, 60, 70, 80, 90), labels = c("", 50, "", 70, "", 90)) +
+  scale_y_continuous(limits = WC_range, expand = c(0, 0), breaks = c(40, 50, 60, 70, 80, 90), labels = c("", 50, "", 70, "", 90)) +
   xlab(expression(paste("Predicted WC (%)", sep = "")))  +   
   ylab(expression(paste("Observed WC (%)", sep = "")))  +
   geom_line(aes(x = mean, y = lwr, colour = Life_form), linetype = "dashed", size= 0.3) +
@@ -171,13 +182,13 @@ I <- ggplot(cwt_WC, aes(x = mean, y = WC, fill = Life_form, colour = Life_form))
   geom_smooth(method='lm', formula = y ~ x, se = FALSE, size = 0.5) + 
   scale_fill_manual(values= pa) +
   scale_color_manual(values= pa) +
-  scale_x_continuous(limits = WC_range, expand = c(0, 0)) +
-  scale_y_continuous(limits = WC_range, expand = c(0, 0)) +
+  scale_x_continuous(limits = WC_range, expand = c(0, 0), breaks = c(40, 50, 60, 70, 80, 90), labels = c("", 50, "", 70, "", 90)) +
+  scale_y_continuous(limits = WC_range, expand = c(0, 0), breaks = c(40, 50, 60, 70, 80, 90), labels = c("", 50, "", 70, "", 90)) +
   xlab(expression(paste("Predicted WC (%)", sep = "")))  +   
   ylab(expression(paste("Observed WC (%)", sep = "")))  +
   geom_line(aes(x = mean, y = lwr, colour = Life_form), linetype = "dashed", size= 0.3) +
   geom_line(aes(x = mean, y = upr, colour = Life_form), linetype = "dashed", size= 0.3) +
-  th
+  th + ylab("")
 
 J <- ggplot(cwt_WC, aes(x = WC, fill = Life_form)) +
   geom_density(alpha = 0.2) +
@@ -210,8 +221,8 @@ M <- ggplot(ref_EWT, aes(x = mean, y = EWT, fill = Life_form, colour = Life_form
   geom_smooth(method='lm', formula = y ~ x, se = FALSE, size = 0.5) + 
   scale_fill_manual(values= pa) +
   scale_color_manual(values= pa) +
-  scale_x_continuous(limits = EWT_range, expand = c(0, 0)) +
-  scale_y_continuous(limits = EWT_range, expand = c(0, 0)) +
+  scale_x_continuous(limits = EWT_range, expand = c(0, 0), breaks = c(0, 75, 150, 225, 300, 375), labels = c(0, "", 150, "", 300, "")) +
+  scale_y_continuous(limits = EWT_range, expand = c(0, 0), breaks = c(0, 75, 150, 225, 300, 375), labels = c(0, "", 150, "", 300, "")) +
   xlab(expression(paste("Predicted EWT (g m"^-2, ")", sep = "")))  +   
   ylab(expression(paste("Observed EWT (g m"^-2, ")", sep = "")))  +
   geom_line(aes(x = mean, y = lwr, colour = Life_form), linetype = "dashed", size= 0.3) +
@@ -225,13 +236,13 @@ N <- ggplot(cwt_EWT, aes(x = mean, y = EWT, fill = Life_form, colour = Life_form
   geom_smooth(method='lm', formula = y ~ x, se = FALSE, size = 0.5) + 
   scale_fill_manual(values= pa) +
   scale_color_manual(values= pa) +
-  scale_x_continuous(limits = EWT_range, expand = c(0, 0)) +
-  scale_y_continuous(limits = EWT_range, expand = c(0, 0)) +
+  scale_x_continuous(limits = EWT_range, expand = c(0, 0), breaks = c(0, 75, 150, 225, 300, 375), labels = c(0, "", 150, "", 300, "")) +
+  scale_y_continuous(limits = EWT_range, expand = c(0, 0), breaks = c(0, 75, 150, 225, 300, 375), labels = c(0, "", 150, "", 300, "")) +
   xlab(expression(paste("Predicted EWT (g m"^-2, ")", sep = "")))  +   
   ylab(expression(paste("Observed EWT (g m"^-2, ")", sep = "")))  +
   geom_line(aes(x = mean, y = lwr, colour = Life_form), linetype = "dashed", size= 0.3) +
   geom_line(aes(x = mean, y = upr, colour = Life_form), linetype = "dashed", size= 0.3) +
-  th
+  th + ylab("")
 
 O <- ggplot(cwt_EWT, aes(x = EWT, fill = Life_form)) +
   geom_density(alpha = 0.2) +
@@ -241,23 +252,24 @@ O <- ggplot(cwt_EWT, aes(x = EWT, fill = Life_form)) +
   theme_void() +
   theme(legend.position = "none", plot.margin = margin(4, 6, 0, 0, "pt")) + rotate()
 
+Figure_5 <- ggarrange(A, B, NULL, 
+                      C, D, E,
+                      Fa, G, NULL,
+                      H, I, J,
+                      K, L, NULL,
+                      M, N, O,
+                      labels = c("", "", "", "a", "b", "", "", "", "", "c", "d", "", "", "", "", "e", "f", ""), 
+                      font.label = list(size = 15, color = "black", face = "plain", family = NULL),
+                      label.x = 0.22,
+                      label.y = 0.99,
+                      ncol = 3, nrow = 6,  align = "hv", 
+                      widths = c(2.5, 2.5, 1), 
+                      heights = c(1, 2.5, 1, 2.5, 1, 2.5),
+                      common.legend = TRUE)
 
-tiff("Figure_5.tif", width = 15, height = 21, units = "cm", res = 600)
+tiff("Figure_5.tif", width = 20, height = 25, units = "cm", res = 600)
 
-ggarrange(A, B, NULL, 
-          C, D, E,
-          Fa, G, NULL,
-          H, I, J,
-          K, L, NULL,
-          M, N, O,
-          labels = c("", "", "", "a", "b", "", "", "", "", "c", "d", "", "", "", "", "e", "f", ""), 
-          font.label = list(size = 15, color = "black", face = "plain", family = NULL),
-          label.x = 0.26,
-          label.y = 0.99,
-          ncol = 3, nrow = 6,  align = "hv", 
-          widths = c(2, 2, 1), 
-          heights = c(1, 2, 1, 2, 1, 2),
-          common.legend = TRUE)
+Figure_5
 
 dev.off()
      

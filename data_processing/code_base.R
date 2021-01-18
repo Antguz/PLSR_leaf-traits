@@ -349,8 +349,8 @@ results_LMA <- pls_evaluation(model = logLMA ~ .,
                           data_split = data_split, 
                           samples_ID = traits_keep, 
                           sec_split = 0.7, 
-                          n_comp_ref = as.numeric(LMA_optimal[1,2]), 
-                          n_comp_cwt = as.numeric(LMA_optimal[2,2]), 
+                          n_comp_ref = 29, 
+                          n_comp_cwt = 16, 
                           iterations = 1000, 
                           threads = 12)
 
@@ -369,8 +369,8 @@ results_WC <- pls_evaluation(model = logWC ~ .,
                               data_split = data_split, 
                               samples_ID = traits_keep, 
                               sec_split = 0.7, 
-                              n_comp_ref = as.numeric(WC_optimal[1,2]), 
-                              n_comp_cwt = as.numeric(WC_optimal[2,2]), 
+                              n_comp_ref = 28, 
+                              n_comp_cwt = 13, 
                               iterations = 1000, 
                               threads = 12)
 
@@ -389,8 +389,8 @@ results_EWT <- pls_evaluation(model = logEWT ~ .,
                               data_split = data_split, 
                               samples_ID = traits_keep, 
                               sec_split = 0.7, 
-                              n_comp_ref = as.numeric(EWT_optimal[1,2]), 
-                              n_comp_cwt = as.numeric(EWT_optimal[2,2]), 
+                              n_comp_ref = 25, 
+                              n_comp_cwt = 13, 
                               iterations = 1000, 
                               threads = 12)
 

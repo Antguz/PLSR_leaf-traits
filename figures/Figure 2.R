@@ -12,84 +12,68 @@ library(data.table)
 library(Rmisc)
 
 ###Data-------------------------------------
-#Read of ID codes
-ID <- fread("01-traits.csv")
-ID <- ID[, c(1:11)]
+#Reflectance spectra
+ref <- fread("/home/antguz/Documents/PLSR-models/Data/03-spectra/04-ref.csv")
+ref <- ref[, c(1, 7:2732)]
+ref[Life_form == "Liana", Life_form := "Lianas"]
+ref[Life_form == "Tree", Life_form := "Trees"]
 
-#Non-transformed spectra data
-vis_ref <- fread("02-vis_ressav.csv")
-lwir_ref <- fread("02-lwir_ressav.csv")
-
-vis_ref <- subset(vis_ref, Wavelength >= 0.45 & Wavelength <= 1.0) #Subset to a especific spectral range
-lwir_ref <- subset(lwir_ref, Wavelength >= 2.6 & Wavelength <= 13) #Subset to a especific spectral range
-
-#Transformed spectra data
-vis_cwt <- fread("03-vis_cwt.csv")
-lwir_cwt <- fread("03-lwir_cwt.csv")
+#Wavelet spectra
+cwt <- fread("/home/antguz/Documents/PLSR-models/Data/03-spectra/04-cwt.csv")
+cwt <- cwt[, c(1, 7:2732)]
+cwt[Life_form == "Liana", Life_form := "Lianas"]
+cwt[Life_form == "Tree", Life_form := "Trees"]
+  
+#Wavelength
+wavelength <- as.numeric(names(ref)[2:2727])
 
 ###Data management---------------------
-#Get wavelength
-vis_wave <- vis_ref$Wavelength
-lwir_wave <- lwir_cwt$Wavelength
+###Get mean, min, max, and IC 
+summaryfun <- function(x)list(mean = mean(x), 
+                              min = min(x), 
+                              max = max(x), 
+                              CIlower = (mean(x) - qnorm(0.95)*sd(x)/sqrt(length(x))),
+                              CIupper = (mean(x) + qnorm(0.95)*sd(x)/sqrt(length(x))))
 
-###Prepare the data
-ID <- ID[, c(1)]
+stats <- rep(c("mean", "min", "max", "CIlower", "CIupper"), 2)
 
-ref <- rbind(vis_ref, lwir_ref, use.names = FALSE)
-wavelength <- ref$Wavelength
-ref <- t(ref[, 2:701])
-colnames(ref) <- wavelength
-cwt <- rbind(vis_cwt, lwir_cwt, use.names = FALSE)
-cwt <- t(cwt[, 2:701])
-colnames(cwt) <- wavelength
+ref_summary <- cbind(stats, ref[, lapply(.SD, summaryfun), by = c("Life_form")])
+cwt_summary <- cbind(stats, cwt[, lapply(.SD, summaryfun), by = c("Life_form")])
 
-ref <- cbind(ID, ref)
-cwt <- cbind(ID, cwt)
+ref_melt <- melt(ref_summary,id.vars=c("Life_form", "stats"),
+                 measure.vars = .SD, 
+                 value.name = "Spectra")
 
-###Get mean and sd 
-ref_mean <- ref[, lapply(.SD, mean, na.rm = TRUE), by = c("Life_form")]
-cwt_mean <- cwt[, lapply(.SD, mean, na.rm = TRUE), by = c("Life_form")]
+ref_melt$Spectra <- as.numeric(ref_melt$Spectra)
 
-ref_melt_mean <- melt(ref_mean,id.vars=c("Life_form"),
+cwt_melt <- melt(cwt_summary,id.vars=c("Life_form", "stats"),
                  measure.vars = .SD,
                  value.name = "Spectra")
 
-cwt_melt_mean <- melt(cwt_mean,id.vars=c("Life_form"),
-                 measure.vars = .SD,
-                 value.name = "Spectra")
+cwt_melt$Spectra <- as.numeric(cwt_melt$Spectra)
 
-ref_sd <- ref[, lapply(.SD, sd, na.rm = TRUE), by = c("Life_form")]
-cwt_sd <- cwt[, lapply(.SD, sd, na.rm = TRUE), by = c("Life_form")]
+ref_dcast <- dcast(ref_melt, Life_form + variable ~ stats, value.var = "Spectra")
+cwt_dcast <- dcast(cwt_melt, Life_form + variable ~ stats, value.var = "Spectra")
 
-ref_melt_sd <- melt(ref_sd,id.vars=c("Life_form"),
-                      measure.vars = .SD,
-                      value.name = "sd")
+colnames(ref_dcast)[2] <- "Wavelength"
+colnames(cwt_dcast)[2] <- "Wavelength"
 
-cwt_melt_sd <- melt(cwt_sd,id.vars=c("Life_form"),
-                      measure.vars = .SD,
-                      value.name = "sd")
+ref_dcast$Wavelength <- as.numeric(as.character(ref_dcast$Wavelength))
+cwt_dcast$Wavelength <- as.numeric(as.character(cwt_dcast$Wavelength))
 
-ref_melt <- merge(ref_melt_mean, ref_melt_sd, by = c("Life_form", "variable"))
-cwt_melt <- merge(cwt_melt_mean, cwt_melt_sd, by = c("Life_form", "variable"))
-
-ref_melt$variable <- as.numeric(as.character(ref_melt$variable))
-colnames(ref_melt)[2] <- "Wavelength"
-cwt_melt$variable <- as.numeric(as.character(cwt_melt$variable))
-colnames(cwt_melt)[2] <- "Wavelength"
-
-ref_vis <- subset(ref_melt, Wavelength <= 1)
+ref_vis <- subset(ref_dcast, Wavelength <= 1)
 ref_vis$Region <- "VIS-NIR"
-ref_lwir <- subset(ref_melt, Wavelength >= 1)
+ref_lwir <- subset(ref_dcast, Wavelength >= 1)
 ref_lwir$Region <- "MLWIR"
-cwt_vis <- subset(cwt_melt, Wavelength <= 1)
+cwt_vis <- subset(cwt_dcast, Wavelength <= 1)
 cwt_vis$Region <- "VIS-NIR"
-cwt_lwir <- subset(cwt_melt, Wavelength >= 1)
+cwt_lwir <- subset(cwt_dcast, Wavelength >= 1)
 cwt_lwir$Region <- "MLWIR"
 
 ###Plot---------------------------------------------------------
 
 #initial arguments
-pa <- c("#33B09F", "#B66A34")
+pa <- c("#e66101", "#5e3c99")
 tamano <- 12
 tamano2 <- 10
 
@@ -104,51 +88,50 @@ th <- theme_bw(base_size = tamano) + theme(plot.background = element_blank(),
                                            strip.background = element_rect(color= "black", linetype="solid"))
 
 A <- ggplot() +
-  geom_ribbon(data = ref_vis, aes(x = Wavelength, ymin = Spectra-sd, ymax = Spectra+sd, fill = Life_form, colour = NA), alpha = 0.2) +
-  geom_line(data = ref_vis, aes(x = Wavelength, y = Spectra, colour = Life_form, group = Life_form), size = 0.5) +
+  geom_ribbon(data = ref_vis, aes(x = Wavelength, ymin = min, ymax = max, fill = Life_form, colour = NA), alpha = 0.2) +
+  geom_line(data = ref_vis, aes(x = Wavelength, y = mean, colour = Life_form, group = Life_form), alpha = 0.90, size = 0.5) +
   scale_fill_manual("Life form", values= pa) +
   scale_colour_manual("Life form", values= pa) +
   ylab("Reflectance") +
   xlab(NULL) +
   scale_x_continuous(limits = c(0.45, 1), expand = c(0, 0), breaks = c(0.45, 0.6, 0.8, 1), labels = c(0.45, 0.6, 0.8, 1)) +
-  scale_y_continuous(limits = c(0, 0.65), expand = c(0, 0), breaks = c(0, 0.2, 0.4, 0.6), labels = c(0, 0.2, 0.4, 0.6)) +
+  scale_y_continuous(limits = c(0, 0.75), expand = c(0, 0), breaks = c(0, 0.15, 0.3, 0.45, 0.6), labels = c(0, "", 0.3, "", 0.6)) +
   th +
   facet_grid(. ~ Region)
   
 B <- ggplot() +
-  geom_ribbon(data = ref_lwir, aes(x = Wavelength, ymin = Spectra-sd, ymax = Spectra+sd, fill = Life_form, colour = NA), alpha = 0.2) +
-  geom_line(data = ref_lwir, aes(x = Wavelength, y = Spectra, colour = Life_form, group = Life_form), size = 0.5) +
+  geom_ribbon(data = ref_lwir, aes(x = Wavelength, ymin = min, ymax = max, fill = Life_form, colour = NA), alpha = 0.2) +
+  geom_line(data = ref_lwir, aes(x = Wavelength, y = mean, colour = Life_form, group = Life_form), alpha = 0.90, size = 0.5) +
   scale_fill_manual("Life form", values= pa) +
   scale_colour_manual("Life form", values= pa) +
   ylab(NULL) +
   xlab(NULL) +
-  scale_x_continuous(limits = c(2.6, 13), expand = c(0, 0), breaks = c(3, 5, 7, 9, 11, 13), labels = c(3, 5, 7, 9, 11, 13)) +
-  scale_y_continuous(limits = c(0, 0.15), expand = c(0, 0), breaks = c(0, 0.05, 0.10, 0.15), labels = c(0, 0.05, 0.10, 0.15)) +
+  scale_x_continuous(limits = c(2.55, 11), expand = c(0, 0), breaks = c(3, 5, 7, 9, 11, 13), labels = c(3, 5, 7, 9, 11, 13)) +
+  scale_y_continuous(limits = c(0, 0.20), expand = c(0, 0), breaks = c(0, 0.05, 0.10, 0.15, 0.2), labels = c(0, "", 0.10, "", 0.2)) +
   th +
   facet_grid(. ~ Region)
 
-
 C <- ggplot() +
-  geom_ribbon(data = cwt_vis, aes(x = Wavelength, ymin = Spectra-sd, ymax = Spectra+sd, fill = Life_form, colour = NA), alpha = 0.2) +
-  geom_line(data = cwt_vis, aes(x = Wavelength, y = Spectra, colour = Life_form, group = Life_form), size = 0.5) +
+  geom_ribbon(data = cwt_vis, aes(x = Wavelength, ymin = min, ymax = max, fill = Life_form, colour = NA), alpha = 0.2) +
+  geom_line(data = cwt_vis, aes(x = Wavelength, y = mean, colour = Life_form, group = Life_form), alpha = 0.90, size = 0.5) +
   scale_fill_manual("Life form", values= pa) +
   scale_colour_manual("Life form", values= pa) +
   ylab("Wavelet") +
   xlab(NULL) +
   scale_x_continuous(limits = c(0.45, 1), expand = c(0, 0), breaks = c(0.45, 0.6, 0.8, 1), labels = c(0.45, 0.6, 0.8, 1)) +
-  scale_y_continuous(limits = c(-0.20, 0.13), expand = c(0, 0)) +
+  scale_y_continuous(limits = c(-1.74, 1.74), expand = c(0, 0)) +
   th +
   facet_grid(. ~ Region)
 
 D <- ggplot() +
-  geom_ribbon(data = cwt_lwir, aes(x = Wavelength, ymin = Spectra-sd, ymax = Spectra+sd, fill = Life_form, colour = NA), alpha = 0.2) +
-  geom_line(data = cwt_lwir, aes(x = Wavelength, y = Spectra, colour = Life_form, group = Life_form), size = 0.5) +
+  geom_ribbon(data = cwt_lwir, aes(x = Wavelength, ymin = min, ymax = max, fill = Life_form, colour = NA), alpha = 0.2) +
+  geom_line(data = cwt_lwir, aes(x = Wavelength, y = mean, colour = Life_form, group = Life_form), alpha = 0.90, size = 0.5) +
   scale_fill_manual("Life form", values= pa) +
   scale_colour_manual("Life form", values= pa) +
   ylab(NULL) +
   xlab(NULL) +
-  scale_x_continuous(limits = c(2.6, 13), expand = c(0, 0), breaks = c(3, 5, 7, 9, 11, 13), labels = c(3, 5, 7, 9, 11, 13)) +
-  scale_y_continuous(limits = c(-0.20, 0.13), expand = c(0, 0)) +
+  scale_x_continuous(limits = c(2.55, 11), expand = c(0, 0), breaks = c(3, 5, 7, 9, 11, 13), labels = c(3, 5, 7, 9, 11, 13)) +
+  scale_y_continuous(limits = c(-0.20, 0.20), expand = c(0, 0), breaks = c(-0.15, 0, 0.15), labels = c(-0.15, 0, 0.15)) +
   th +
   facet_grid(. ~ Region)
 
@@ -168,3 +151,4 @@ annotate_figure(fig,
                 bottom = text_grob(expression(paste("Wavelength (", mu, "m)", sep = "")), color = "black", size = 14))
 
 dev.off()
+
