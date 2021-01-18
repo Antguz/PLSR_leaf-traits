@@ -4,13 +4,51 @@
 
 #Note: inputs come from code_base.R
 
-
 ###Libraries
 library(data.table)
 library(ggExtra)
 library(plyr)
 
 ###Data and preparations
+#Training observations
+LMA_predict <- fread("/home/antguz/Documents/PLSR-models/Data/04-results/06-Predict_train/LMA_predict_training.csv")
+LMA_predict[Spectra == "CWT", Spectra := "Wavelet"]
+WC_predict <- fread("/home/antguz/Documents/PLSR-models/Data/04-results/06-Predict_train/WC_predict_training.csv")
+WC_predict[Spectra == "CWT", Spectra := "Wavelet"]
+EWT_predict <- fread("/home/antguz/Documents/PLSR-models/Data/04-results/06-Predict_train/EWT_predict_training.csv")
+EWT_predict[Spectra == "CWT", Spectra := "Wavelet"]
+
+LMA  <- melt(LMA_predict, id.vars=c("Spectra", "iteration"),
+             measure.vars = .SD,
+             value.name = "Trait")
+LMA <- LMA[, list(mean(Trait), (mean(Trait) - sd(Trait)), (mean(Trait) + sd(Trait))), by = c("Spectra", "variable")]
+colnames(LMA)[3:5] <- c("mean", "sd_lower", "sd_upper")
+LMA <- LMA[order(Spectra, variable)]
+
+WC  <- melt(WC_predict, id.vars=c("Spectra", "iteration"),
+            measure.vars = .SD,
+            value.name = "Trait")
+WC <- WC[, list(mean(Trait), (mean(Trait) - sd(Trait)), (mean(Trait) + sd(Trait))), by = c("Spectra", "variable")]
+colnames(WC)[3:5] <- c("mean", "sd_lower", "sd_upper")
+WC <- WC[order(Spectra, variable)]
+
+EWT  <- melt(EWT_predict, id.vars=c("Spectra", "iteration"),
+             measure.vars = .SD,
+             value.name = "Trait")
+EWT <- EWT[, list(mean(Trait), (mean(Trait) - sd(Trait)), (mean(Trait) + sd(Trait))), by = c("Spectra", "variable")]
+colnames(EWT)[3:5] <- c("mean", "sd_lower", "sd_upper")
+EWT <- EWT[order(Spectra, variable)]
+
+observed <- fread("/home/antguz/Documents/PLSR-models/Data/03-spectra/traits_training.csv")
+colnames(observed)[3:5] <- c("LMA", "WC", "EWT")
+observed$LMA <- 10^observed$LMA
+observed$WC <- 10^observed$WC
+observed$EWT <- 10^observed$EWT
+observed[Life_form == "Tree", Life_form := "Trees"]
+observed[Life_form == "Liana", Life_form := "Lianas"]
+observed$Life_form <- as.factor(observed$Life_form)
+observed$Life_form <- factor(observed$Life_form, levels = c("Lianas", "Trees"))
+
 ref_LMA_train <- cbind(observed[,c(1,3)], LMA[Spectra == "Reflectance"])
 ref_LMA_train$Process <- "Training"
 ref_WC_train <- cbind(observed[,c(1,4)], WC[Spectra == "Reflectance"])
@@ -23,6 +61,45 @@ cwt_WC_train <- cbind(observed[,c(1,4)], WC[Spectra == "Wavelet"])
 cwt_WC_train$Process <- "Training"
 cwt_EWT_train <- cbind(observed[,c(1,5)], EWT[Spectra == "Wavelet"])
 cwt_EWT_train$Process <- "Training"
+
+#Testing observations
+LMA_predict <- fread("/home/antguz/Documents/PLSR-models/Data/04-results/07-Predict_test/LMA_predict_testing.csv")
+LMA_predict[Spectra == "CWT", Spectra := "Wavelet"]
+WC_predict <- fread("/home/antguz/Documents/PLSR-models/Data/04-results/07-Predict_test/WC_predict_testing.csv")
+WC_predict[Spectra == "CWT", Spectra := "Wavelet"]
+EWT_predict <- fread("/home/antguz/Documents/PLSR-models/Data/04-results/07-Predict_test/EWT_predict_testing.csv")
+EWT_predict[Spectra == "CWT", Spectra := "Wavelet"]
+
+LMA  <- melt(LMA_predict, id.vars=c("Spectra", "iteration"),
+             measure.vars = .SD,
+             value.name = "Trait")
+LMA <- LMA[, list(mean(Trait), (mean(Trait) - sd(Trait)), (mean(Trait) + sd(Trait))), by = c("Spectra", "variable")]
+colnames(LMA)[3:5] <- c("mean", "sd_lower", "sd_upper")
+LMA <- LMA[order(Spectra, variable)]
+
+WC  <- melt(WC_predict, id.vars=c("Spectra", "iteration"),
+            measure.vars = .SD,
+            value.name = "Trait")
+WC <- WC[, list(mean(Trait), (mean(Trait) - sd(Trait)), (mean(Trait) + sd(Trait))), by = c("Spectra", "variable")]
+colnames(WC)[3:5] <- c("mean", "sd_lower", "sd_upper")
+WC <- WC[order(Spectra, variable)]
+
+EWT  <- melt(EWT_predict, id.vars=c("Spectra", "iteration"),
+             measure.vars = .SD,
+             value.name = "Trait")
+EWT <- EWT[, list(mean(Trait), (mean(Trait) - sd(Trait)), (mean(Trait) + sd(Trait))), by = c("Spectra", "variable")]
+colnames(EWT)[3:5] <- c("mean", "sd_lower", "sd_upper")
+EWT <- EWT[order(Spectra, variable)]
+
+observed <- fread("/home/antguz/Documents/PLSR-models/Data/03-spectra/traits_testing.csv")
+colnames(observed)[3:5] <- c("LMA", "WC", "EWT")
+observed$LMA <- 10^observed$LMA
+observed$WC <- 10^observed$WC
+observed$EWT <- 10^observed$EWT
+observed[Life_form == "Tree", Life_form := "Trees"]
+observed[Life_form == "Liana", Life_form := "Lianas"]
+observed$Life_form <- as.factor(observed$Life_form)
+observed$Life_form <- factor(observed$Life_form, levels = c("Lianas", "Trees"))
 
 ref_LMA_test <- cbind(observed[,c(1,3)], LMA[Spectra == "Reflectance"])
 ref_LMA_test$Process <- "Testing"
@@ -37,6 +114,8 @@ cwt_WC_test$Process <- "Testing"
 cwt_EWT_test <- cbind(observed[,c(1,5)], EWT[Spectra == "Wavelet"])
 cwt_EWT_test$Process <- "Testing"
 
+
+#Data manage
 LMA_train <- rbind(ref_LMA_train, cwt_LMA_train)
 WC_train <- rbind(ref_WC_train, cwt_WC_train)
 EWT_train <- rbind(ref_EWT_train, cwt_EWT_train)
@@ -72,23 +151,6 @@ WC_range <- c(40, 95)
 EWT_range <- c(0, 410)
 size_point <- 1.5
 
-A <- ggplot(LMA_train, aes(x = mean, fill = Spectra)) +
-  geom_density(alpha = 0.2) +
-  scale_fill_manual(values = pa) +
-  scale_color_manual(values = pa) +
-  scale_x_continuous(limits = LMA_range, expand = c(0, 0)) +
-  theme_void() +
-  theme(legend.position = "none", plot.margin = margin(4, 6, 0, 0, "pt"))
-
-
-B <- ggplot(LMA_test, aes(x = mean, fill = Spectra)) +
-  geom_density(alpha = 0.2) +
-  scale_fill_manual(values = pa) +
-  scale_color_manual(values = pa) +
-  scale_x_continuous(limits = LMA_range, expand = c(0, 0)) +
-  theme_void() +
-  theme(legend.position = "none", plot.margin = margin(4, 6, 0, 0, "pt"))
-
 C <- ggplot(LMA_train, aes(x = mean, y = LMA, fill = Spectra, colour = Spectra)) +
   geom_abline(intercept = 0, slope = 1, color= "grey", linetype= "solid", size= 0.3)+
   geom_errorbarh(aes(xmin = sd_lower, xmax = sd_upper, height = 0, colour = Spectra), alpha = 0.2) +
@@ -103,15 +165,6 @@ C <- ggplot(LMA_train, aes(x = mean, y = LMA, fill = Spectra, colour = Spectra))
   geom_line(aes(x = mean, y = lwr, colour = Spectra), linetype = "dashed", size= 0.3) +
   geom_line(aes(x = mean, y = upr, colour = Spectra), linetype = "dashed", size= 0.3) +
   th
-
-D <- ggplot(LMA_train, aes(x = LMA, fill = Spectra)) +
-  geom_density(alpha = 0.2) +
-  scale_fill_manual(values = pa) +
-  scale_color_manual(values = pa) +
-  scale_x_continuous(limits = LMA_range, expand = c(0, 0)) +
-  theme_void() +
-  theme(legend.position = "none", plot.margin = margin(4, 6, 0, 0, "pt")) + rotate()
-
 
 E <- ggplot(LMA_test, aes(x = mean, y = LMA, fill = Spectra, colour = Spectra)) +
   geom_abline(intercept = 0, slope = 1, color= "grey", linetype= "solid", size= 0.3)+
@@ -128,31 +181,6 @@ E <- ggplot(LMA_test, aes(x = mean, y = LMA, fill = Spectra, colour = Spectra)) 
   geom_line(aes(x = mean, y = upr, colour = Spectra), linetype = "dashed", size= 0.3) +
   th + ylab("")
 
-Fa <- ggplot(LMA_test, aes(x = LMA, fill = Spectra)) +
-  geom_density(alpha = 0.2) +
-  scale_fill_manual(values = pa) +
-  scale_color_manual(values = pa) +
-  scale_x_continuous(limits = LMA_range, expand = c(0, 0)) +
-  theme_void() +
-  theme(legend.position = "none", plot.margin = margin(4, 6, 0, 0, "pt")) + rotate()
-
-
-G <- ggplot(WC_train, aes(x = mean, fill = Spectra)) +
-  geom_density(alpha = 0.2) +
-  scale_fill_manual(values = pa) +
-  scale_color_manual(values = pa) +
-  scale_x_continuous(limits = WC_range, expand = c(0, 0)) +
-  theme_void() +
-  theme(legend.position = "none", plot.margin = margin(4, 6, 0, 0, "pt"))
-
-H <- ggplot(WC_test, aes(x = mean, fill = Spectra)) +
-  geom_density(alpha = 0.2) +
-  scale_fill_manual(values = pa) +
-  scale_color_manual(values = pa) +
-  scale_x_continuous(limits = WC_range, expand = c(0, 0)) +
-  theme_void() +
-  theme(legend.position = "none", plot.margin = margin(4, 6, 0, 0, "pt"))
-
 I <- ggplot(WC_train, aes(x = mean, y = WC, fill = Spectra, colour = Spectra)) +
   geom_abline(intercept = 0, slope = 1, color= "grey", linetype= "solid", size= 0.3)+
   geom_errorbarh(aes(xmin = sd_lower, xmax = sd_upper, height = 0, colour = Spectra), alpha = 0.2) +
@@ -167,14 +195,6 @@ I <- ggplot(WC_train, aes(x = mean, y = WC, fill = Spectra, colour = Spectra)) +
   geom_line(aes(x = mean, y = lwr, colour = Spectra), linetype = "dashed", size= 0.3) +
   geom_line(aes(x = mean, y = upr, colour = Spectra), linetype = "dashed", size= 0.3) +
   th
-
-J <- ggplot(WC_train, aes(x = WC, fill = Spectra)) +
-  geom_density(alpha = 0.2) +
-  scale_fill_manual(values = pa) +
-  scale_color_manual(values = pa) +
-  scale_x_continuous(limits = WC_range, expand = c(0, 0)) +
-  theme_void() +
-  theme(legend.position = "none", plot.margin = margin(4, 6, 0, 0, "pt")) + rotate()
 
 K <- ggplot(WC_test, aes(x = mean, y = WC, fill = Spectra, colour = Spectra)) +
   geom_abline(intercept = 0, slope = 1, color= "grey", linetype= "solid", size= 0.3)+
@@ -191,30 +211,6 @@ K <- ggplot(WC_test, aes(x = mean, y = WC, fill = Spectra, colour = Spectra)) +
   geom_line(aes(x = mean, y = upr, colour = Spectra), linetype = "dashed", size= 0.3) +
   th +  ylab("")
 
-L <- ggplot(WC_test, aes(x = WC, fill = Spectra)) +
-  geom_density(alpha = 0.2) +
-  scale_fill_manual(values = pa) +
-  scale_color_manual(values = pa) +
-  scale_x_continuous(limits = WC_range, expand = c(0, 0)) +
-  theme_void() +
-  theme(legend.position = "none", plot.margin = margin(4, 6, 0, 0, "pt")) + rotate()
-
-M <- ggplot(EWT_train, aes(x = mean, fill = Spectra)) +
-  geom_density(alpha = 0.2) +
-  scale_fill_manual(values = pa) +
-  scale_color_manual(values = pa) +
-  scale_x_continuous(limits = EWT_range, expand = c(0, 0)) +
-  theme_void() +
-  theme(legend.position = "none", plot.margin = margin(4, 6, 0, 0, "pt"))
-
-N <- ggplot(EWT_test, aes(x = mean, fill = Spectra)) +
-  geom_density(alpha = 0.2) +
-  scale_fill_manual(values = pa) +
-  scale_color_manual(values = pa) +
-  scale_x_continuous(limits = EWT_range, expand = c(0, 0)) +
-  theme_void() +
-  theme(legend.position = "none", plot.margin = margin(4, 6, 0, 0, "pt"))
-
 O <- ggplot(EWT_train, aes(x = mean, y = EWT, fill = Spectra, colour = Spectra)) +
   geom_abline(intercept = 0, slope = 1, color= "grey", linetype= "solid", size= 0.3)+
   geom_errorbarh(aes(xmin = sd_lower, xmax = sd_upper, height = 0, colour = Spectra), alpha = 0.2) +
@@ -229,15 +225,6 @@ O <- ggplot(EWT_train, aes(x = mean, y = EWT, fill = Spectra, colour = Spectra))
   geom_line(aes(x = mean, y = lwr, colour = Spectra), linetype = "dashed", size= 0.3) +
   geom_line(aes(x = mean, y = upr, colour = Spectra), linetype = "dashed", size= 0.3) +
   th
-
-P <- ggplot(EWT_train, aes(x = EWT, fill = Spectra)) +
-  geom_density(alpha = 0.2) +
-  scale_fill_manual(values = pa) +
-  scale_color_manual(values = pa) +
-  scale_x_continuous(limits = EWT_range, expand = c(0, 0)) +
-  theme_void() +
-  theme(legend.position = "none", plot.margin = margin(4, 6, 0, 0, "pt")) + rotate()
-
 
 Q <- ggplot(EWT_test, aes(x = mean, y = EWT, fill = Spectra, colour = Spectra)) +
   geom_abline(intercept = 0, slope = 1, color= "grey", linetype= "solid", size= 0.3)+
@@ -254,14 +241,6 @@ Q <- ggplot(EWT_test, aes(x = mean, y = EWT, fill = Spectra, colour = Spectra)) 
   geom_line(aes(x = mean, y = upr, colour = Spectra), linetype = "dashed", size= 0.3) +
   th + ylab("")
 
-R <- ggplot(EWT_train, aes(x = EWT, fill = Spectra)) +
-  geom_density(alpha = 0.2) +
-  scale_fill_manual(values = pa) +
-  scale_color_manual(values = pa) +
-  scale_x_continuous(limits = EWT_range, expand = c(0, 0)) +
-  theme_void() +
-  theme(legend.position = "none", plot.margin = margin(4, 6, 0, 0, "pt")) + rotate()
-
 Figure_5 <- ggarrange(C, E, 
                       I, K, 
                       O, Q, 
@@ -274,7 +253,7 @@ Figure_5 <- ggarrange(C, E,
                       heights = c(2.5, 2.5, 2.5),
                       common.legend = TRUE)
 
-tiff("Figure_5_NEW.tif", width = 19.5, height = 21, units = "cm", res = 600)
+tiff("Figure_S5.tif", width = 19.5, height = 21, units = "cm", res = 600)
 
 Figure_5
 
