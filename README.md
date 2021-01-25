@@ -24,7 +24,7 @@ record](https://zenodo.org/badge/latestdoi/):
   month        = oct,
   year         = 2020,
   publisher    = {Zenodo},
-  version      = {v0.1},
+  version      = {v0.2},
   doi          = {10.5281/zenodo.4124182},
   url          = {https://doi.org/10.5281/zenodo.4124182}
 }
